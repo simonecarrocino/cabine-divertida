@@ -260,7 +260,7 @@ fun FrameThumb(style: FrameStyle, selected: Boolean, onClick: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             FramedBox(style, caption = null, modifier = Modifier.width(48.dp), small = true) {
-                Box(Modifier.fillMaxSize().background(Color(0xFFF2A7B7)))
+                Box(Modifier.fillMaxSize().background(Color(0xFFCFE3D5)))
             }
             Text(style.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Cores.BordoEscuro, maxLines = 1)
         }

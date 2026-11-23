@@ -92,7 +92,7 @@ fun HomeScreen(vm: AppViewModel) {
                     if (first != null) {
                         Image(first.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                     } else {
-                        Box(Modifier.fillMaxSize().background(Color(0xFFF2A7B7)), contentAlignment = Alignment.Center) {
+                        Box(Modifier.fillMaxSize().background(Color(0xFFCFE3D5)), contentAlignment = Alignment.Center) {
                             Icon(Icons.Rounded.PhotoCamera, contentDescription = null, tint = Cores.Bordo, modifier = Modifier.size(40.dp))
                         }
                     }
@@ -442,7 +442,7 @@ fun EventConfigScreen(vm: AppViewModel) {
                         border = BorderStroke(2.dp, if (c.useCustomFrame) Cores.Bordo else Color.Transparent),
                     ) {
                         Column(Modifier.padding(8.dp).width(60.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(Modifier.width(48.dp).aspectRatio(custom.width.toFloat() / custom.height).background(Color(0xFFF2A7B7))) {
+                            Box(Modifier.width(48.dp).aspectRatio(custom.width.toFloat() / custom.height).background(Color(0xFFCFE3D5))) {
                                 Image(custom.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
                             }
                             Text("Minha arte", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Cores.BordoEscuro, maxLines = 1)

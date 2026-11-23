@@ -5,11 +5,11 @@ import kotlin.math.roundToInt
 
 /** Molduras prontas. As cores são ARGB (0xAARRGGBB). */
 enum class FrameStyle(val label: String, val background: Long, val captionColor: Long) {
-    POLAROID("Polaroid", 0xFFFFFFFF, 0xFF7B1E3A),
+    POLAROID("Polaroid", 0xFFFFFFFF, 0xFFB3122E),
     CLASSICA("Clássica", 0xFF3B2A1E, 0xFFC9A56B),
     FESTA("Festa", 0xFFFFF4D6, 0xFFC2410C),
     NATUREZA("Natureza", 0xFFDCE8D5, 0xFF2E5A40),
-    SIMPLES("Simples", 0xFF4A0E1F, 0xFFFFFFFF),
+    SIMPLES("Simples", 0xFF12372A, 0xFFFFFFFF),
 }
 
 /** Tamanhos de impressão oferecidos. */

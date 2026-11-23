@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="fundo">#FFF3C4</color>
-    <color name="bordo">#7B1E3A</color>
-    <color name="bordo_escuro">#4A0E1F</color>
-    <color name="amarelo">#FFC93C</color>
+    <color name="fundo">#FFF8EC</color>
+    <color name="bordo">#B3122E</color>
+    <color name="bordo_escuro">#12372A</color>
+    <color name="amarelo">#E8B53D</color>
 </resources>
