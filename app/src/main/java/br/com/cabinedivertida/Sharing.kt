@@ -1,6 +1,8 @@
 package br.com.cabinedivertida
 
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -51,6 +53,28 @@ object Sharing {
             }
         }
         ctx.startActivity(Intent.createChooser(base, "Enviar foto"))
+    }
+
+    /**
+     * Abre o Instagram com a foto carregada. A pessoa escolhe Feed, Stories ou Reels lá dentro.
+     * Posta na conta que estiver logada no app do Instagram deste celular.
+     * Retorna false se o Instagram não estiver instalado.
+     */
+    fun instagram(ctx: Context, bmp: Bitmap): Boolean =
+        try {
+            ctx.startActivity(Intent(baseIntent(ctx, bmp)).setPackage("com.instagram.android"))
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        }
+
+    /** Limpa o @ digitado: "@ Maria.Silva " vira "maria.silva". */
+    fun normalizeHandle(raw: String): String =
+        raw.trim().removePrefix("@").filter { it.isLetterOrDigit() || it == '.' || it == '_' }.lowercase()
+
+    fun copyText(ctx: Context, label: String, text: String) {
+        val cm = ctx.getSystemService(ClipboardManager::class.java)
+        cm?.setPrimaryClip(ClipData.newPlainText(label, text))
     }
 
     fun other(ctx: Context, bmp: Bitmap) {

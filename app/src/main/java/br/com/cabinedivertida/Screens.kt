@@ -478,6 +478,26 @@ fun EventConfigScreen(vm: AppViewModel) {
                 )
                 HorizontalDivider(color = Cores.Fundo)
                 SwitchRow("Receber no WhatsApp", "O convidado digita o número dele", c.allowWhats, { vm.updateEvent(c.copy(allowWhats = it)) })
+                HorizontalDivider(color = Cores.Fundo)
+                SwitchRow(
+                    "Postar no Instagram",
+                    "Na conta do evento, com o convidado como colaborador",
+                    c.allowInstagram,
+                    { vm.updateEvent(c.copy(allowInstagram = it)) },
+                )
+            }
+            if (c.allowInstagram) {
+                OutlinedTextField(
+                    value = c.igCaption,
+                    onValueChange = { vm.updateEvent(c.copy(igCaption = it.take(300))) },
+                    label = { Text("Legenda do post") },
+                    placeholder = { Text("Ex.: Festa da Primavera! #FestaDaPrimavera") },
+                    supportingText = {
+                        Text("Faça login no app do Instagram deste celular com a conta do evento. O @ do convidado é acrescentado no fim da legenda.")
+                    },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             OutlinedTextField(
@@ -609,6 +629,8 @@ fun EventResultScreen(vm: AppViewModel) {
     var printed by remember { mutableStateOf(false) }
     var showPhone by remember { mutableStateOf(false) }
     var phone by remember { mutableStateOf("") }
+    var showIg by remember { mutableStateOf(false) }
+    var handle by remember { mutableStateOf("") }
 
     fun doPrint() {
         val a = ctx.findActivity()
@@ -678,13 +700,60 @@ fun EventResultScreen(vm: AppViewModel) {
                 }
             }
         }
-        if (c.allowPrint || c.allowWhats) {
+        if (showIg) {
+            val h = Sharing.normalizeHandle(handle)
+            Column(
+                Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = handle,
+                    onValueChange = { handle = it.take(31) },
+                    label = { Text("Seu @ no Instagram") },
+                    placeholder = { Text("@seuperfil") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    if (h.isNotEmpty()) {
+                        "No Instagram: escolha Publicação › Avançar › segure no campo da legenda e toque em Colar › Marcar pessoas › Convidar colaborador › digite @$h. Depois é só aceitar o convite no seu perfil."
+                    } else {
+                        "No Instagram: escolha Publicação › Avançar › segure no campo da legenda e toque em Colar › Compartilhar."
+                    },
+                    fontSize = 13.sp,
+                    color = Cores.Texto2,
+                )
+                BigButton(
+                    "Abrir o Instagram",
+                    {
+                        val text = listOf(c.igCaption.trim(), if (h.isNotEmpty()) "Com @$h" else "")
+                            .filter { it.isNotEmpty() }
+                            .joinToString("\n\n")
+                        if (text.isNotEmpty()) Sharing.copyText(ctx, "Legenda", text)
+                        val ok = img != null && Sharing.instagram(ctx, img)
+                        if (!ok) {
+                            Toast.makeText(ctx, "Instale e entre no Instagram neste celular", Toast.LENGTH_LONG).show()
+                        } else {
+                            handle = ""
+                            showIg = false
+                        }
+                    },
+                    icon = Icons.Rounded.CameraAlt,
+                    container = Cores.Bordo,
+                    height = 54.dp,
+                )
+            }
+        }
+        if (c.allowPrint) {
+            BigButton("Imprimir", { doPrint() }, icon = Icons.Rounded.Print, container = Cores.Amarelo, contentColor = Cores.BordoEscuro, height = 60.dp)
+        }
+        if (c.allowWhats || c.allowInstagram) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (c.allowPrint) {
-                    BigButton("Imprimir", { doPrint() }, modifier = Modifier.weight(1f), icon = Icons.Rounded.Print, container = Cores.Amarelo, contentColor = Cores.BordoEscuro, height = 64.dp)
-                }
                 if (c.allowWhats) {
-                    BigButton("WhatsApp", { showPhone = !showPhone }, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Rounded.Chat, container = Cores.Whats, height = 64.dp)
+                    BigButton("WhatsApp", { showPhone = !showPhone; showIg = false }, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Rounded.Chat, container = Cores.Whats, height = 60.dp)
+                }
+                if (c.allowInstagram) {
+                    BigButton("Instagram", { showIg = !showIg; showPhone = false }, modifier = Modifier.weight(1f), icon = Icons.Rounded.CameraAlt, container = Cores.Bordo, height = 60.dp)
                 }
             }
         }

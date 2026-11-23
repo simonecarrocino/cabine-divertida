@@ -44,6 +44,8 @@ data class EventConfig(
     val allowPrint: Boolean = true,
     val autoPrint: Boolean = false,
     val allowWhats: Boolean = true,
+    val allowInstagram: Boolean = false,
+    val igCaption: String = "",
     val pin: String = "1234",
 )
 

@@ -65,6 +65,8 @@ class EventStore(private val ctx: Context) {
             allowPrint = prefs.getBoolean("allowPrint", d.allowPrint),
             autoPrint = prefs.getBoolean("autoPrint", d.autoPrint),
             allowWhats = prefs.getBoolean("allowWhats", d.allowWhats),
+            allowInstagram = prefs.getBoolean("allowInstagram", d.allowInstagram),
+            igCaption = prefs.getString("igCaption", null) ?: d.igCaption,
             pin = prefs.getString("pin", null) ?: d.pin,
         )
     }
@@ -82,6 +84,8 @@ class EventStore(private val ctx: Context) {
             .putBoolean("allowPrint", c.allowPrint)
             .putBoolean("autoPrint", c.autoPrint)
             .putBoolean("allowWhats", c.allowWhats)
+            .putBoolean("allowInstagram", c.allowInstagram)
+            .putString("igCaption", c.igCaption)
             .putString("pin", c.pin)
             .apply()
     }
