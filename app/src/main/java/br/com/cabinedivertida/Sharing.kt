@@ -125,16 +125,33 @@ object Sharing {
         cm?.setPrimaryClip(ClipData.newPlainText(label, text))
     }
 
+    /** Nome seguro para pasta ou arquivo: tira barras e símbolos. */
+    fun safeName(raw: String): String =
+        raw.trim().filter { it.isLetterOrDigit() || it in " -_.&()" }.replace(Regex("\\s+"), " ").take(60).trim()
+
+    /** Compartilha um arquivo (por exemplo, o evento exportado) pelo WhatsApp ou outro app. */
+    fun shareFile(ctx: Context, file: File, mime: String, title: String) {
+        val uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        ctx.startActivity(Intent.createChooser(intent, title))
+    }
+
     fun other(ctx: Context, bmp: Bitmap) {
         ctx.startActivity(Intent.createChooser(baseIntent(ctx, bmp), "Compartilhar foto"))
     }
 
     /** Salva na galeria, no álbum "Cabine Divertida". */
-    fun saveToGallery(ctx: Context, bmp: Bitmap): Boolean {
+    fun saveToGallery(ctx: Context, bmp: Bitmap, album: String? = null): Boolean {
+        val folder = Environment.DIRECTORY_PICTURES + "/Cabine Divertida" +
+            (album?.let { safeName(it) }?.takeIf { it.isNotEmpty() }?.let { "/$it" } ?: "")
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "cabine_${System.currentTimeMillis()}.jpg")
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Cabine Divertida")
+            put(MediaStore.Images.Media.RELATIVE_PATH, folder)
         }
         val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
         return ctx.contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.JPEG, 95, it) } ?: false

@@ -4,6 +4,7 @@ package br.com.cabinedivertida
 
 import android.graphics.Bitmap
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -395,6 +396,7 @@ fun PrintScreen(vm: AppViewModel) {
 
 @Composable
 fun EventConfigScreen(vm: AppViewModel) {
+    val ctx = LocalContext.current
     val c = vm.event
     val pickFrame = rememberGalleryPicker { b -> vm.useCustomFrame(b) }
     var askDelete by remember { mutableStateOf(false) }
@@ -540,6 +542,20 @@ fun EventConfigScreen(vm: AppViewModel) {
                 OutlineBigButton("Ver fotos", { vm.go(Screen.EventPhotos) }, modifier = Modifier.weight(1f), icon = Icons.Rounded.PhotoLibrary)
                 OutlineBigButton("Duplicar", { vm.duplicateEvent(c) }, modifier = Modifier.weight(1f), icon = Icons.Rounded.ContentCopy)
             }
+            OutlineBigButton(
+                "Compartilhar com colegas",
+                {
+                    runCatching { vm.exportEvent(c) }
+                        .onSuccess { Sharing.shareFile(ctx, it, "application/zip", "Enviar evento") }
+                        .onFailure { Toast.makeText(ctx, "Não foi possível gerar o arquivo do evento", Toast.LENGTH_SHORT).show() }
+                },
+                icon = Icons.Rounded.Share,
+            )
+            Text(
+                "Manda um arquivo com a configuração e a moldura. A colega abre o arquivo no celular dela (ou usa \"Importar evento\") e fotografa igual.",
+                fontSize = 13.sp,
+                color = Cores.Texto2,
+            )
             TextButton(onClick = { askDelete = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                 Icon(Icons.Rounded.Delete, contentDescription = null, tint = Cores.Erro)
                 Spacer(Modifier.width(6.dp))
@@ -843,6 +859,16 @@ fun EventResultScreen(vm: AppViewModel) {
 
 @Composable
 fun EventsScreen(vm: AppViewModel) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val importLauncher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val c = withContext(Dispatchers.IO) { runCatching { vm.importEvent(uri) }.getOrNull() }
+                Toast.makeText(ctx, if (c != null) "Evento \"${c.name}\" importado" else "Esse arquivo não é um evento da Cabine Divertida", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     LaunchedEffect(vm.events) {
         counts = withContext(Dispatchers.IO) { vm.events.associate { it.id to vm.eventPhotos(it).size } }
@@ -892,14 +918,23 @@ fun EventsScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(8.dp))
         }
-        BigButton(
-            "Novo evento",
-            { vm.newEvent(); vm.go(Screen.EventConfig) },
-            modifier = Modifier.padding(24.dp),
-            icon = Icons.Rounded.Add,
-            container = Cores.Amarelo,
-            contentColor = Cores.BordoEscuro,
-        )
+        Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlineBigButton(
+                "Importar",
+                { importLauncher.launch(arrayOf("application/zip", "application/octet-stream", "*/*")) },
+                modifier = Modifier.weight(1f),
+                icon = Icons.Rounded.Download,
+                height = 60.dp,
+            )
+            BigButton(
+                "Novo evento",
+                { vm.newEvent(); vm.go(Screen.EventConfig) },
+                modifier = Modifier.weight(1.3f),
+                icon = Icons.Rounded.Add,
+                container = Cores.Amarelo,
+                contentColor = Cores.BordoEscuro,
+            )
+        }
     }
 }
 
@@ -930,6 +965,17 @@ fun EventPhotosScreen(vm: AppViewModel) {
                 Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Column(
+                    Modifier.fillMaxWidth().background(Cores.AmareloSuave, RoundedCornerShape(12.dp)).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("Juntar as fotos no Google Drive", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Cores.BordoEscuro)
+                    Text(
+                        "As fotos do evento ficam na galeria, no álbum \"${Sharing.safeName(c.name)}\" (dentro de Imagens › Cabine Divertida). No fim do evento, abra o app Google Drive › pasta compartilhada do evento › + › Fazer upload, e escolha as fotos desse álbum.",
+                        fontSize = 13.sp,
+                        color = Cores.Texto2,
+                    )
+                }
                 Text(
                     "${if (list.size == 1) "1 foto" else "${list.size} fotos"} · toque numa foto para imprimir ou enviar de novo",
                     color = Cores.Texto2,
@@ -963,18 +1009,18 @@ fun EventPhotosScreen(vm: AppViewModel) {
         }
         if (!list.isNullOrEmpty()) {
             BigButton(
-                if (saving) "Salvando…" else "Salvar todas na galeria",
+                if (saving) "Salvando…" else "Salvar todas no álbum do evento",
                 {
                     saving = true
                     scope.launch {
                         val ok = withContext(Dispatchers.IO) {
                             vm.eventPhotos(c).count { f ->
                                 val b = android.graphics.BitmapFactory.decodeFile(f.path)
-                                b != null && Sharing.saveToGallery(ctx, b)
+                                b != null && Sharing.saveToGallery(ctx, b, album = c.name)
                             }
                         }
                         saving = false
-                        Toast.makeText(ctx, "$ok fotos salvas no álbum Cabine Divertida", Toast.LENGTH_LONG).show()
+                        Toast.makeText(ctx, "$ok fotos salvas no álbum ${Sharing.safeName(c.name)}", Toast.LENGTH_LONG).show()
                     }
                 },
                 modifier = Modifier.padding(24.dp),

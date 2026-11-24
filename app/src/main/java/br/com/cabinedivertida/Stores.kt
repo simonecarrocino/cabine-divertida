@@ -9,6 +9,9 @@ import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 object Images {
     /** Abre uma foto da galeria já na orientação certa e num tamanho seguro. */
@@ -138,6 +141,76 @@ class EventStore(private val ctx: Context) {
 
     private inline fun <reified T : Enum<T>> enumOr(name: String?, fallback: T): T =
         runCatching { enumValueOf<T>(name ?: "") }.getOrDefault(fallback)
+
+    /**
+     * Gera um arquivo .zip com a configuração (evento.json) e a moldura própria (moldura.png),
+     * para mandar a colegas pelo WhatsApp.
+     */
+    fun export(c: EventConfig): File {
+        val dir = File(ctx.cacheDir, "compartilhar").apply { mkdirs() }
+        dir.listFiles()?.forEach { it.delete() }
+        val name = c.name.trim().filter { it.isLetterOrDigit() || it in " -_" }.take(50).trim().ifEmpty { "evento" }
+        val out = File(dir, "Evento - $name.zip")
+        ZipOutputStream(out.outputStream()).use { zip ->
+            zip.putNextEntry(ZipEntry("evento.json"))
+            zip.write(toJson(c).toString(2).toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
+            val frame = frameFile(c.id)
+            if (c.useCustomFrame && frame.exists()) {
+                zip.putNextEntry(ZipEntry("moldura.png"))
+                frame.inputStream().use { it.copyTo(zip) }
+                zip.closeEntry()
+            }
+        }
+        return out
+    }
+
+    /**
+     * Lê um evento exportado. Só aceita os dois arquivos esperados e ignora o resto.
+     * Devolve o evento lido (com a moldura já guardada) ou null se o arquivo não for de evento.
+     */
+    fun import(input: java.io.InputStream): EventConfig? {
+        var json: String? = null
+        var frameBytes: ByteArray? = null
+        ZipInputStream(input).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                when (entry.name) {
+                    "evento.json" -> json = readLimited(zip, 200_000)?.toString(Charsets.UTF_8)
+                    "moldura.png" -> frameBytes = readLimited(zip, 30_000_000)
+                }
+                zip.closeEntry()
+            }
+        }
+        val text = json ?: return null
+        val parsed = runCatching { JSONObject(text) }.getOrNull() ?: return null
+        if (!parsed.has("name")) return null
+        val bytes = frameBytes
+        val id = parsed.optString("id").ifBlank { java.util.UUID.randomUUID().toString() }
+            .filter { it.isLetterOrDigit() || it == '-' }.take(64)
+        parsed.put("id", id)
+        if (bytes != null) {
+            // Só guarda se for mesmo uma imagem
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            if (bounds.outWidth > 0) frameFile(id).writeBytes(bytes)
+        }
+        return fromJson(parsed)
+    }
+
+    private fun readLimited(input: java.io.InputStream, max: Int): ByteArray? {
+        val buf = java.io.ByteArrayOutputStream()
+        val chunk = ByteArray(16_384)
+        var total = 0
+        while (true) {
+            val n = input.read(chunk)
+            if (n < 0) break
+            total += n
+            if (total > max) return null
+            buf.write(chunk, 0, n)
+        }
+        return buf.toByteArray()
+    }
 
     private fun toJson(c: EventConfig) = JSONObject().apply {
         put("id", c.id)

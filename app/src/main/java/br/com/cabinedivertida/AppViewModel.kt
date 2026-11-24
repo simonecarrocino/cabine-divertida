@@ -113,11 +113,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         updateEvent(event.copy(useCustomFrame = true))
     }
 
+    /** Arquivo .zip do evento, para compartilhar. */
+    fun exportEvent(c: EventConfig): java.io.File = eventStore.export(c)
+
+    /** Importa um evento recebido. Se já existir (mesmo evento), atualiza a configuração. */
+    fun importEvent(uri: android.net.Uri): EventConfig? {
+        val ctx = getApplication<Application>()
+        val c = ctx.contentResolver.openInputStream(uri)?.use { eventStore.import(it) } ?: return null
+        events = listOf(c) + events.filter { it.id != c.id }
+        eventStore.saveAll(events)
+        openEvent(c)
+        return c
+    }
+
     fun eventPhotos(c: EventConfig): List<java.io.File> = eventStore.photos(c.id)
 
     /** Guarda a foto na pasta do evento aberto (chamar fora da thread principal). */
     fun saveEventPhoto(img: Bitmap) {
         eventStore.addPhoto(event.id, img)
+        // Também vai para a galeria, num álbum com o nome do evento (para enviar ao Drive depois)
+        Sharing.saveToGallery(getApplication(), img, album = event.name)
     }
 
     private var lastRecent: Bitmap? = null
