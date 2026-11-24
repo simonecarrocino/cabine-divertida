@@ -20,4 +20,10 @@ Cada alteração enviada para a branch `main` gera uma versão nova automaticame
 
 ## Assinatura
 
-O arquivo `app/cabine.keystore` assina o APK para que as atualizações instalem por cima. Ele serve para instalação direta. Para publicar na Play Store, crie uma chave nova e guarde-a fora do repositório.
+O APK é assinado com a chave da Cabine Divertida, que **não fica no repositório**.
+No GitHub ela vem de dois segredos (Settings › Secrets and variables › Actions):
+
+- `KEYSTORE_BASE64`: o arquivo da chave em base64
+- `KEYSTORE_PASSWORD`: a senha da chave
+
+Guarde uma cópia do arquivo `cabine.keystore` em lugar seguro: sem ela não é possível publicar atualizações que instalem por cima do app.

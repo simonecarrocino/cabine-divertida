@@ -21,10 +21,12 @@ android {
 
     signingConfigs {
         create("cabine") {
+            // A chave fica fora do repositório: no GitHub vem do segredo KEYSTORE_BASE64,
+            // e a senha do segredo KEYSTORE_PASSWORD (veja .github/workflows/build.yml).
             storeFile = file("cabine.keystore")
-            storePassword = "cabine123"
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
             keyAlias = "cabine"
-            keyPassword = "cabine123"
+            keyPassword = System.getenv("KEYSTORE_PASSWORD")
         }
     }
 
