@@ -28,7 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -58,20 +60,22 @@ fun HomeScreen(vm: AppViewModel) {
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                "OLÁ!",
-                modifier = Modifier.background(Cores.Amarelo, RoundedCornerShape(50)).padding(horizontal = 12.dp, vertical = 4.dp),
-                color = Cores.BordoEscuro,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 13.sp,
-                letterSpacing = 1.sp,
+        Column(
+            Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Image(
+                painterResource(R.drawable.logo_cabine),
+                contentDescription = "Cabine Divertida",
+                modifier = Modifier.width(210.dp),
+                contentScale = ContentScale.FillWidth,
             )
-            Text("Cabine Divertida", color = Cores.Bordo, fontSize = 38.sp, fontWeight = FontWeight.Bold, lineHeight = 42.sp)
             Text(
                 "Tire a foto, escolha a moldura e envie pelo WhatsApp ou imprima.",
                 color = Cores.Texto2,
                 fontSize = 16.sp,
+                textAlign = TextAlign.Center,
             )
         }
 
@@ -83,21 +87,6 @@ fun HomeScreen(vm: AppViewModel) {
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Box(
-                Modifier.fillMaxWidth().height(190.dp).background(Cores.AmareloClaro, RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                FramedBox(FrameStyle.POLAROID, caption = null, modifier = Modifier.width(120.dp).rotate(-4f).shadow(8.dp)) {
-                    val first = recents.firstOrNull()
-                    if (first != null) {
-                        Image(first.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                    } else {
-                        Box(Modifier.fillMaxSize().background(Color(0xFFCFE3D5)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Rounded.PhotoCamera, contentDescription = null, tint = Cores.Bordo, modifier = Modifier.size(40.dp))
-                        }
-                    }
-                }
-            }
             BigButton("Tirar foto", { vm.go(Screen.Camera) }, icon = Icons.Rounded.PhotoCamera)
             OutlineBigButton("Escolher da galeria", openGallery, icon = Icons.Rounded.PhotoLibrary)
         }
