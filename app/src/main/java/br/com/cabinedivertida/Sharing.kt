@@ -3,6 +3,7 @@ package br.com.cabinedivertida
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
@@ -62,18 +63,56 @@ object Sharing {
         ctx.startActivity(Intent.createChooser(base, "Enviar foto"))
     }
 
+    private const val INSTAGRAM = "com.instagram.android"
+
     /**
-     * Abre o Instagram com a foto carregada. A pessoa escolhe Feed, Stories ou Reels lá dentro.
-     * Posta na conta que estiver logada no app do Instagram deste celular.
+     * Pergunta ao Instagram instalado para quais destinos ele aceita uma foto
+     * (Story, Reels, Post) e devolve a tela de cada um. Mensagens diretas ficam de fora.
+     * A lista depende da versão do Instagram do celular.
+     */
+    fun instagramTargets(ctx: Context): Map<IgTarget, ComponentName> {
+        val probe = Intent(Intent.ACTION_SEND).setType("image/jpeg").setPackage(INSTAGRAM)
+        val found = runCatching {
+            @Suppress("DEPRECATION")
+            ctx.packageManager.queryIntentActivities(probe, 0)
+        }.getOrDefault(emptyList())
+        val out = linkedMapOf<IgTarget, ComponentName>()
+        for (ri in found) {
+            val ai = ri.activityInfo ?: continue
+            val name = ai.name.lowercase()
+            val label = ri.loadLabel(ctx.packageManager).toString().lowercase()
+            val target = when {
+                "direct" in name || "direct" in label || "chat" in label || "mensag" in label || "message" in label || "conversa" in label -> null
+                "story" in name || "stories" in name || "story" in label || "stories" in label -> IgTarget.STORY
+                "reel" in name || "clips" in name || "reel" in label -> IgTarget.REELS
+                else -> IgTarget.POST
+            }
+            if (target != null && target !in out) out[target] = ComponentName(ai.packageName, ai.name)
+        }
+        return IgTarget.entries.mapNotNull { t -> out[t]?.let { t to it } }.toMap()
+    }
+
+    /**
+     * Abre o Instagram com a foto, direto no destino escolhido (Story, Reels ou Post).
+     * Sem destino, o Instagram decide. Posta na conta logada no Instagram deste celular.
      * Retorna false se o Instagram não estiver instalado.
      */
-    fun instagram(ctx: Context, bmp: Bitmap): Boolean =
-        try {
-            ctx.startActivity(Intent(baseIntent(ctx, bmp)).setPackage("com.instagram.android"))
+    fun instagram(ctx: Context, bmp: Bitmap, target: ComponentName? = null): Boolean {
+        val intent = Intent(baseIntent(ctx, bmp))
+        if (target != null) intent.component = target else intent.setPackage(INSTAGRAM)
+        return try {
+            ctx.startActivity(intent)
             true
-        } catch (_: ActivityNotFoundException) {
-            false
+        } catch (_: Exception) {
+            if (target == null) return false
+            try {
+                ctx.startActivity(Intent(baseIntent(ctx, bmp)).setPackage(INSTAGRAM))
+                true
+            } catch (_: ActivityNotFoundException) {
+                false
+            }
         }
+    }
 
     /** Limpa o @ digitado: "@ Maria.Silva " vira "maria.silva". */
     fun normalizeHandle(raw: String): String =

@@ -69,6 +69,13 @@ data class EventConfig(
     val pin: String = "1234",
 )
 
+/** Destinos de postagem no Instagram. */
+enum class IgTarget(val label: String) {
+    STORY("Story"),
+    REELS("Reels"),
+    POST("Post"),
+}
+
 sealed interface Screen {
     data object Home : Screen
     data object Camera : Screen

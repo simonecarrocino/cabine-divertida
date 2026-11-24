@@ -777,10 +777,26 @@ fun EventResultScreen(vm: AppViewModel) {
         }
         if (showIg) {
             val h = Sharing.normalizeHandle(handle)
+            val targets = remember { Sharing.instagramTargets(ctx) }
+            val preferred = when (c.format) {
+                OutputFormat.STORY -> IgTarget.STORY
+                OutputFormat.REELS -> IgTarget.REELS
+                else -> IgTarget.POST
+            }
+            var igTarget by remember { mutableStateOf(if (preferred in targets) preferred else targets.keys.firstOrNull()) }
             Column(
                 Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (targets.size > 1) {
+                    val keys = targets.keys.toList()
+                    Segmented(
+                        keys.map { it.label },
+                        keys.indexOf(igTarget).coerceAtLeast(0),
+                        { igTarget = keys[it] },
+                        Modifier.fillMaxWidth(),
+                    )
+                }
                 OutlinedTextField(
                     value = handle,
                     onValueChange = { handle = it.take(31) },
@@ -790,22 +806,27 @@ fun EventResultScreen(vm: AppViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
-                    if (h.isNotEmpty()) {
-                        "No Instagram: escolha Publicação › Avançar › segure no campo da legenda e toque em Colar › Marcar pessoas › Convidar colaborador › digite @$h. Depois é só aceitar o convite no seu perfil."
-                    } else {
-                        "No Instagram: escolha Publicação › Avançar › segure no campo da legenda e toque em Colar › Compartilhar."
+                    when {
+                        igTarget == IgTarget.STORY && h.isNotEmpty() ->
+                            "No Story: toque em Aa, segure na tela e toque em Colar (a legenda já vai com @$h). Stories não têm colaborador: o @ marca você e você pode repostar."
+                        igTarget == IgTarget.STORY ->
+                            "No Story: toque em Aa, segure na tela e toque em Colar para pôr a legenda. Depois toque em Seu story."
+                        h.isNotEmpty() ->
+                            "No Instagram: Avançar › segure no campo da legenda e toque em Colar › Marcar pessoas › Convidar colaborador › digite @$h. Depois é só aceitar o convite no seu perfil."
+                        else ->
+                            "No Instagram: Avançar › segure no campo da legenda e toque em Colar › Compartilhar."
                     },
                     fontSize = 13.sp,
                     color = Cores.Texto2,
                 )
                 BigButton(
-                    "Abrir o Instagram",
+                    igTarget?.let { "Abrir no ${it.label}" } ?: "Abrir o Instagram",
                     {
                         val text = listOf(c.igCaption.trim(), if (h.isNotEmpty()) "Com @$h" else "")
                             .filter { it.isNotEmpty() }
                             .joinToString("\n\n")
                         if (text.isNotEmpty()) Sharing.copyText(ctx, "Legenda", text)
-                        val ok = img != null && Sharing.instagram(ctx, img)
+                        val ok = img != null && Sharing.instagram(ctx, img, igTarget?.let { targets[it] })
                         if (!ok) {
                             Toast.makeText(ctx, "Instale e entre no Instagram neste celular", Toast.LENGTH_LONG).show()
                         } else {
