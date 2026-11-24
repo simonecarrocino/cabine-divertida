@@ -52,7 +52,10 @@ enum class OutputFormat(val label: String, val hint: String, val widthPx: Int, v
 
 /** Configuração do Modo Evento, definida uma vez pela organizadora. */
 data class EventConfig(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val createdAt: Long = System.currentTimeMillis(),
     val name: String = "Meu evento",
+    val frontCamera: Boolean = true,
     val caption: String = "",
     val frame: FrameStyle = FrameStyle.POLAROID,
     val useCustomFrame: Boolean = false,
@@ -78,4 +81,6 @@ sealed interface Screen {
     data object EventConfig : Screen
     data object EventCamera : Screen
     data object EventResult : Screen
+    data object Events : Screen
+    data object EventPhotos : Screen
 }

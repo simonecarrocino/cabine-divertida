@@ -5,8 +5,12 @@ package br.com.cabinedivertida
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.ActivityNotFoundException
 import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.ContactsContract
+import android.widget.Toast
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -445,6 +449,33 @@ fun rememberGalleryPicker(onPicked: (Bitmap) -> Unit): () -> Unit {
         }
     }
     return { launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+}
+
+/**
+ * Abre a agenda do celular para escolher um contato e devolve o número dele.
+ * Usa o seletor do próprio Android, que dá acesso só ao contato escolhido (não pede permissão de contatos).
+ */
+@Composable
+fun rememberPhonePicker(onPicked: (String) -> Unit): () -> Unit {
+    val ctx = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data ?: return@rememberLauncherForActivityResult
+        val number = runCatching {
+            ctx.contentResolver.query(
+                uri,
+                arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+                null, null, null,
+            )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        }.getOrNull()
+        if (!number.isNullOrBlank()) onPicked(number)
+    }
+    return {
+        try {
+            launcher.launch(Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(ctx, "Não encontrei a agenda de contatos", Toast.LENGTH_SHORT).show()
+        }
+    }
 }
 
 /** Botão redondo de disparo. */

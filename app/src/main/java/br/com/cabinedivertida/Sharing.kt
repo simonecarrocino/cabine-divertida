@@ -25,10 +25,17 @@ object Sharing {
 
     /** Aceita "(22) 99999-0000" e devolve "5522999990000". Retorna null se não parecer um celular. */
     fun normalizePhone(raw: String): String? {
-        val d = raw.filter { it.isDigit() }
-        return when (d.length) {
-            10, 11 -> "55$d"
-            12, 13 -> d
+        var d = raw.filter { it.isDigit() }
+        val international = raw.trim().startsWith("+")
+        if (!international) {
+            // Contatos salvos como "0 21 99999-0000" ou "0 41 21 99999-0000" (com operadora)
+            d = d.trimStart('0')
+            if (d.length in 12..13 && !d.startsWith("55")) d = d.drop(2)
+        }
+        return when {
+            d.length in 10..11 && !international -> "55$d"
+            d.length in 12..13 && d.startsWith("55") -> d
+            international && d.length in 8..15 -> d
             else -> null
         }
     }

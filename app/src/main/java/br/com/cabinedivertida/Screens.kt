@@ -8,6 +8,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -93,7 +94,7 @@ fun HomeScreen(vm: AppViewModel) {
 
         // Modo Evento
         Surface(
-            onClick = { vm.go(Screen.EventConfig) },
+            onClick = { vm.go(Screen.Events) },
             shape = RoundedCornerShape(16.dp),
             color = Cores.Amarelo,
             contentColor = Cores.BordoEscuro,
@@ -396,6 +397,7 @@ fun PrintScreen(vm: AppViewModel) {
 fun EventConfigScreen(vm: AppViewModel) {
     val c = vm.event
     val pickFrame = rememberGalleryPicker { b -> vm.useCustomFrame(b) }
+    var askDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TopBar("Configurar evento", onBack = { vm.back() })
@@ -419,6 +421,14 @@ fun EventConfigScreen(vm: AppViewModel) {
                 placeholder = { Text("Ex.: Festa da Primavera · 12.12") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
+            )
+
+            SectionLabel("Câmera que abre primeiro")
+            Segmented(
+                listOf("Frontal (selfie)", "Traseira"),
+                if (c.frontCamera) 0 else 1,
+                { vm.updateEvent(c.copy(frontCamera = it == 0)) },
+                Modifier.fillMaxWidth(),
             )
 
             SectionLabel("Moldura do evento")
@@ -517,11 +527,37 @@ fun EventConfigScreen(vm: AppViewModel) {
                 icon = Icons.Rounded.PlayArrow,
                 enabled = c.pin.length >= 4,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlineBigButton("Ver fotos", { vm.go(Screen.EventPhotos) }, modifier = Modifier.weight(1f), icon = Icons.Rounded.PhotoLibrary)
+                OutlineBigButton("Duplicar", { vm.duplicateEvent(c) }, modifier = Modifier.weight(1f), icon = Icons.Rounded.ContentCopy)
+            }
+            TextButton(onClick = { askDelete = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                Icon(Icons.Rounded.Delete, contentDescription = null, tint = Cores.Erro)
+                Spacer(Modifier.width(6.dp))
+                Text("Excluir este evento", color = Cores.Erro, fontWeight = FontWeight.SemiBold)
+            }
         }
+    }
+
+    if (askDelete) {
+        AlertDialog(
+            onDismissRequest = { askDelete = false },
+            title = { Text("Excluir \"${c.name}\"?") },
+            text = { Text("A configuração e as fotos guardadas no app para este evento serão apagadas. As fotos já salvas na galeria do celular continuam lá.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    askDelete = false
+                    vm.deleteEvent(c)
+                    vm.back()
+                }) { Text("Excluir", color = Cores.Erro) }
+            },
+            dismissButton = { TextButton(onClick = { askDelete = false }) { Text("Cancelar") } },
+        )
     }
 }
 
 // =============== 7. Evento — câmera ===============
+
 
 @Composable
 fun EventCameraScreen(vm: AppViewModel) {
@@ -529,7 +565,7 @@ fun EventCameraScreen(vm: AppViewModel) {
     val c = vm.event
     val scope = rememberCoroutineScope()
     val granted = rememberCameraPermission()
-    var front by remember { mutableStateOf(true) }
+    var front by remember { mutableStateOf(vm.event.frontCamera) }
     var capture by remember { mutableStateOf<androidx.camera.core.ImageCapture?>(null) }
     var countdown by remember { mutableStateOf<Int?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -622,6 +658,7 @@ fun EventCameraScreen(vm: AppViewModel) {
         PinDialog(c.pin, onDismiss = { askPin = false }, onOk = {
             askPin = false
             vm.reset(Screen.Home)
+            vm.go(Screen.Events)
             vm.go(Screen.EventConfig)
         })
     }
@@ -648,16 +685,22 @@ fun EventResultScreen(vm: AppViewModel) {
         }
     }
 
+    val reviewing = vm.reviewing
+    val pickContact = rememberPhonePicker { number -> phone = number }
+
     LaunchedEffect(img) {
-        if (img != null) {
-            withContext(Dispatchers.IO) { vm.addRecent(img) }
+        if (img != null && !reviewing) {
+            withContext(Dispatchers.IO) {
+                vm.addRecent(img)
+                vm.saveEventPhoto(img)
+            }
             if (c.allowPrint && c.autoPrint) doPrint()
         }
     }
 
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Column {
-            Text("Que foto linda!", color = Cores.Bordo, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text(if (reviewing) "Foto do evento" else "Que foto linda!", color = Cores.Bordo, fontSize = 28.sp, fontWeight = FontWeight.Bold)
             Text(c.name, color = Cores.Texto2, fontSize = 14.sp)
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -690,6 +733,11 @@ fun EventResultScreen(vm: AppViewModel) {
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
                         modifier = Modifier.weight(1f),
                     )
+                    FilledTonalIconButton(
+                        onClick = pickContact,
+                        modifier = Modifier.size(56.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = Cores.AmareloSuave, contentColor = Cores.BordoEscuro),
+                    ) { Icon(Icons.Rounded.Contacts, contentDescription = "Escolher dos contatos") }
                     Button(
                         onClick = {
                             val p = Sharing.normalizePhone(phone)
@@ -765,10 +813,164 @@ fun EventResultScreen(vm: AppViewModel) {
                 }
             }
         }
-        OutlineBigButton("Tirar outra foto", {
-            vm.photo = null
-            vm.finalImage = null
-            vm.reset(Screen.EventCamera)
-        }, icon = Icons.Rounded.PhotoCamera)
+        if (reviewing) {
+            OutlineBigButton("Voltar às fotos", {
+                vm.reviewing = false
+                vm.finalImage = null
+                vm.back()
+            }, icon = Icons.Rounded.PhotoLibrary)
+        } else {
+            OutlineBigButton("Tirar outra foto", {
+                vm.photo = null
+                vm.finalImage = null
+                vm.reset(Screen.EventCamera)
+            }, icon = Icons.Rounded.PhotoCamera)
+        }
+    }
+}
+
+// =============== 9. Meus eventos ===============
+
+@Composable
+fun EventsScreen(vm: AppViewModel) {
+    var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    LaunchedEffect(vm.events) {
+        counts = withContext(Dispatchers.IO) { vm.events.associate { it.id to vm.eventPhotos(it).size } }
+    }
+    val fmt = remember { java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale("pt", "BR")) }
+
+    Column(Modifier.fillMaxSize()) {
+        TopBar("Meus eventos", onBack = { vm.back() })
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            if (vm.events.isEmpty()) {
+                Text(
+                    "Nenhum evento ainda. Crie o primeiro: você define nome, moldura, formato e impressão uma vez, e ele fica salvo aqui.",
+                    color = Cores.Texto2,
+                    fontSize = 15.sp,
+                    modifier = Modifier.padding(vertical = 24.dp),
+                )
+            }
+            vm.events.forEach { e ->
+                val n = counts[e.id] ?: 0
+                Column(
+                    Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(18.dp)).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Column {
+                        Text(e.name, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Cores.BordoEscuro)
+                        Text(
+                            "Criado em ${fmt.format(java.util.Date(e.createdAt))} · ${e.format.label} · ${if (n == 1) "1 foto" else "$n fotos"}",
+                            fontSize = 13.sp,
+                            color = Cores.Texto2,
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        BigButton(
+                            "Iniciar",
+                            { vm.openEvent(e); vm.reset(Screen.EventCamera) },
+                            modifier = Modifier.weight(1.2f),
+                            icon = Icons.Rounded.PlayArrow,
+                            height = 48.dp,
+                        )
+                        OutlineBigButton("Editar", { vm.openEvent(e); vm.go(Screen.EventConfig) }, modifier = Modifier.weight(1f), height = 48.dp)
+                        OutlineBigButton("Fotos", { vm.openEvent(e); vm.go(Screen.EventPhotos) }, modifier = Modifier.weight(1f), height = 48.dp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        BigButton(
+            "Novo evento",
+            { vm.newEvent(); vm.go(Screen.EventConfig) },
+            modifier = Modifier.padding(24.dp),
+            icon = Icons.Rounded.Add,
+            container = Cores.Amarelo,
+            contentColor = Cores.BordoEscuro,
+        )
+    }
+}
+
+// =============== 10. Fotos do evento ===============
+
+@Composable
+fun EventPhotosScreen(vm: AppViewModel) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val c = vm.event
+    var thumbs by remember { mutableStateOf<List<Pair<java.io.File, Bitmap>>?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    LaunchedEffect(c.id) {
+        thumbs = withContext(Dispatchers.IO) {
+            vm.eventPhotos(c).mapNotNull { f -> Images.loadFile(f, 360)?.let { f to it } }
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        TopBar(c.name, onBack = { vm.back() })
+        val list = thumbs
+        when {
+            list == null -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Cores.Bordo) }
+            list.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                Text("Nenhuma foto neste evento ainda.", color = Cores.Texto2, fontSize = 15.sp)
+            }
+            else -> Column(
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "${if (list.size == 1) "1 foto" else "${list.size} fotos"} · toque numa foto para imprimir ou enviar de novo",
+                    color = Cores.Texto2,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+                list.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        row.forEach { (file, thumb) ->
+                            Image(
+                                thumb.asImageBitmap(),
+                                contentDescription = "Foto do evento",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.weight(1f).aspectRatio(0.75f).clip(RoundedCornerShape(8.dp)).clickable {
+                                    scope.launch {
+                                        val full = withContext(Dispatchers.IO) { android.graphics.BitmapFactory.decodeFile(file.path) }
+                                        if (full != null) {
+                                            vm.finalImage = full
+                                            vm.reviewing = true
+                                            vm.go(Screen.EventResult)
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                        repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+        if (!list.isNullOrEmpty()) {
+            BigButton(
+                if (saving) "Salvando…" else "Salvar todas na galeria",
+                {
+                    saving = true
+                    scope.launch {
+                        val ok = withContext(Dispatchers.IO) {
+                            vm.eventPhotos(c).count { f ->
+                                val b = android.graphics.BitmapFactory.decodeFile(f.path)
+                                b != null && Sharing.saveToGallery(ctx, b)
+                            }
+                        }
+                        saving = false
+                        Toast.makeText(ctx, "$ok fotos salvas no álbum Cabine Divertida", Toast.LENGTH_LONG).show()
+                    }
+                },
+                modifier = Modifier.padding(24.dp),
+                icon = Icons.Rounded.Download,
+                enabled = !saving,
+            )
+        }
     }
 }

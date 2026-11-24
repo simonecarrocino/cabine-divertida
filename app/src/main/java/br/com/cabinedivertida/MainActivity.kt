@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
 fun App(vm: AppViewModel) {
     val activity = LocalContext.current.findActivity()
     val screen = vm.screen
-    val inEvent = screen == Screen.EventCamera || screen == Screen.EventResult
+    val inEvent = screen == Screen.EventCamera || (screen == Screen.EventResult && !vm.reviewing)
     val dark = screen == Screen.Camera || screen == Screen.EventCamera
 
     // No modo evento o botão voltar não faz nada: só sai com o PIN.
@@ -51,6 +51,8 @@ fun App(vm: AppViewModel) {
             Screen.EventConfig -> EventConfigScreen(vm)
             Screen.EventCamera -> EventCameraScreen(vm)
             Screen.EventResult -> EventResultScreen(vm)
+            Screen.Events -> EventsScreen(vm)
+            Screen.EventPhotos -> EventPhotosScreen(vm)
         }
     }
 }

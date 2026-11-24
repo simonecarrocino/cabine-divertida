@@ -46,26 +46,78 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var fill by mutableStateOf(true)
     var copies by mutableIntStateOf(1)
 
-    // Modo Evento
+    // Modo Evento: lista de eventos salvos e o evento aberto
     private val eventStore = EventStore(app)
-    var event by mutableStateOf(eventStore.load())
+    var events by mutableStateOf(eventStore.loadAll())
+        private set
+    var event by mutableStateOf(
+        events.firstOrNull { it.id == eventStore.currentId() } ?: events.firstOrNull() ?: EventConfig()
+    )
         private set
     var customFrame by mutableStateOf<Bitmap?>(null)
         private set
 
+    /** true quando a tela "foto pronta" foi aberta pela galeria do evento (reenviar/reimprimir). */
+    var reviewing by mutableStateOf(false)
+
     init {
-        if (event.useCustomFrame) customFrame = eventStore.loadCustomFrame()
+        loadFrameFor(event)
+    }
+
+    private fun loadFrameFor(c: EventConfig) {
+        customFrame = if (c.useCustomFrame) eventStore.loadCustomFrame(c.id) else null
+    }
+
+    fun openEvent(c: EventConfig) {
+        event = c
+        eventStore.saveCurrentId(c.id)
+        loadFrameFor(c)
+    }
+
+    fun newEvent() {
+        val n = events.size + 1
+        val c = EventConfig(name = "Evento $n")
+        events = listOf(c) + events
+        eventStore.saveAll(events)
+        openEvent(c)
+    }
+
+    fun duplicateEvent(c: EventConfig) {
+        val copy = c.copy(id = java.util.UUID.randomUUID().toString(), createdAt = System.currentTimeMillis(), name = c.name + " (cópia)")
+        eventStore.copyCustomFrame(c.id, copy.id)
+        events = listOf(copy) + events
+        eventStore.saveAll(events)
+        openEvent(copy)
+    }
+
+    fun deleteEvent(c: EventConfig) {
+        eventStore.delete(c.id)
+        events = events.filter { it.id != c.id }
+        eventStore.saveAll(events)
+        if (event.id == c.id) {
+            event = events.firstOrNull() ?: EventConfig()
+            loadFrameFor(event)
+        }
     }
 
     fun updateEvent(c: EventConfig) {
         event = c
-        eventStore.save(c)
+        events = if (events.any { it.id == c.id }) events.map { if (it.id == c.id) c else it } else listOf(c) + events
+        eventStore.saveAll(events)
+        eventStore.saveCurrentId(c.id)
     }
 
     fun useCustomFrame(b: Bitmap) {
-        eventStore.saveCustomFrame(b)
+        eventStore.saveCustomFrame(event.id, b)
         customFrame = b
         updateEvent(event.copy(useCustomFrame = true))
+    }
+
+    fun eventPhotos(c: EventConfig): List<java.io.File> = eventStore.photos(c.id)
+
+    /** Guarda a foto na pasta do evento aberto (chamar fora da thread principal). */
+    fun saveEventPhoto(img: Bitmap) {
+        eventStore.addPhoto(event.id, img)
     }
 
     private var lastRecent: Bitmap? = null
@@ -76,7 +128,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         Recents.add(getApplication(), img)
     }
 
-    /** Monta a imagem final (foto + moldura). */
     /** Escolhe o formato; os de foto já escolhem o papel correspondente. */
     fun chooseFormat(f: OutputFormat) {
         format = f
