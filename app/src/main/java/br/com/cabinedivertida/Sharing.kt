@@ -49,9 +49,11 @@ object Sharing {
         }
 
     /** Abre o WhatsApp com a foto anexada. Com número, já abre a conversa daquele contato. */
-    fun whatsapp(ctx: Context, bmp: Bitmap, phone: String? = null) {
+    fun whatsapp(ctx: Context, bmp: Bitmap, phone: String? = null, text: String? = null) {
         val base = baseIntent(ctx, bmp)
         if (phone != null) base.putExtra("jid", "$phone@s.whatsapp.net")
+        // O WhatsApp usa esse texto como legenda da foto
+        if (!text.isNullOrBlank()) base.putExtra(Intent.EXTRA_TEXT, text)
         for (pkg in listOf("com.whatsapp", "com.whatsapp.w4b")) {
             try {
                 ctx.startActivity(Intent(base).setPackage(pkg))

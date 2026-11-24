@@ -497,7 +497,7 @@ fun EventConfigScreen(vm: AppViewModel) {
                     enabled = c.allowPrint,
                 )
                 HorizontalDivider(color = Cores.Fundo)
-                SwitchRow("Receber no WhatsApp", "O convidado digita o número dele", c.allowWhats, { vm.updateEvent(c.copy(allowWhats = it)) })
+                SwitchRow("Enviar pelo WhatsApp", "Abre o WhatsApp para escolher o contato, com a legenda", c.allowWhats, { vm.updateEvent(c.copy(allowWhats = it)) })
                 HorizontalDivider(color = Cores.Fundo)
                 SwitchRow(
                     "Postar no Instagram",
@@ -506,14 +506,14 @@ fun EventConfigScreen(vm: AppViewModel) {
                     { vm.updateEvent(c.copy(allowInstagram = it)) },
                 )
             }
-            if (c.allowInstagram) {
+            if (c.allowInstagram || c.allowWhats) {
                 OutlinedTextField(
                     value = c.igCaption,
                     onValueChange = { vm.updateEvent(c.copy(igCaption = it.take(300))) },
-                    label = { Text("Legenda do post") },
+                    label = { Text("Legenda das fotos") },
                     placeholder = { Text("Ex.: Festa da Primavera! #FestaDaPrimavera") },
                     supportingText = {
-                        Text("Faça login no app do Instagram deste celular com a conta do evento. O @ do convidado é acrescentado no fim da legenda.")
+                        Text("Vai junto no WhatsApp e no Instagram. Para o Instagram, entre no app do Instagram deste celular com a conta do evento.")
                     },
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth(),
@@ -667,8 +667,6 @@ fun EventCameraScreen(vm: AppViewModel) {
         PinDialog(c.pin, onDismiss = { askPin = false }, onOk = {
             askPin = false
             vm.reset(Screen.Home)
-            vm.go(Screen.Events)
-            vm.go(Screen.EventConfig)
         })
     }
 }
@@ -681,8 +679,6 @@ fun EventResultScreen(vm: AppViewModel) {
     val c = vm.event
     val img = vm.finalImage
     var printed by remember { mutableStateOf(false) }
-    var showPhone by remember { mutableStateOf(false) }
-    var phone by remember { mutableStateOf("") }
     var showIg by remember { mutableStateOf(false) }
     var handle by remember { mutableStateOf("") }
     var askExit by remember { mutableStateOf(false) }
@@ -696,7 +692,6 @@ fun EventResultScreen(vm: AppViewModel) {
     }
 
     val reviewing = vm.reviewing
-    val pickContact = rememberPhonePicker { number -> phone = number }
 
     LaunchedEffect(img) {
         if (img != null && !reviewing) {
@@ -736,43 +731,6 @@ fun EventResultScreen(vm: AppViewModel) {
                 Icon(Icons.Rounded.Check, contentDescription = null, tint = Cores.Bordo)
                 Spacer(Modifier.width(8.dp))
                 Text("Enviada para a impressora · ${c.paper.label}", color = Cores.Bordo, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        if (showPhone) {
-            Column(
-                Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(16.dp)).padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = phone,
-                        onValueChange = { v -> phone = v.filter { it.isDigit() || it in " ()-+" }.take(20) },
-                        label = { Text("Seu WhatsApp com DDD") },
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
-                        modifier = Modifier.weight(1f),
-                    )
-                    FilledTonalIconButton(
-                        onClick = pickContact,
-                        modifier = Modifier.size(56.dp),
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = Cores.AmareloSuave, contentColor = Cores.BordoEscuro),
-                    ) { Icon(Icons.Rounded.Contacts, contentDescription = "Escolher dos contatos") }
-                    Button(
-                        onClick = {
-                            val p = Sharing.normalizePhone(phone)
-                            if (p == null || img == null) {
-                                Toast.makeText(ctx, "Confira o número (com DDD)", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Sharing.whatsapp(ctx, img, p)
-                                phone = ""
-                                showPhone = false
-                            }
-                        },
-                        modifier = Modifier.height(56.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Cores.Whats),
-                    ) { Text("Enviar", fontWeight = FontWeight.Bold) }
-                }
             }
         }
         if (showIg) {
@@ -843,10 +801,13 @@ fun EventResultScreen(vm: AppViewModel) {
         if (c.allowWhats || c.allowInstagram) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (c.allowInstagram) {
-                    BigButton("Instagram", { showIg = !showIg; showPhone = false }, modifier = Modifier.weight(1f), icon = Icons.Rounded.CameraAlt, container = Cores.Bordo, height = 60.dp)
+                    BigButton("Instagram", { showIg = !showIg }, modifier = Modifier.weight(1f), icon = Icons.Rounded.CameraAlt, container = Cores.Bordo, height = 60.dp)
                 }
                 if (c.allowWhats) {
-                    BigButton("WhatsApp", { showPhone = !showPhone; showIg = false }, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Rounded.Chat, container = Cores.Whats, height = 60.dp)
+                    BigButton("WhatsApp", {
+                        showIg = false
+                        img?.let { Sharing.whatsapp(ctx, it, text = c.igCaption.ifBlank { null }) }
+                    }, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Rounded.Chat, container = Cores.Whats, height = 60.dp)
                 }
             }
         }
@@ -874,8 +835,6 @@ fun EventResultScreen(vm: AppViewModel) {
             vm.photo = null
             vm.finalImage = null
             vm.reset(Screen.Home)
-            vm.go(Screen.Events)
-            vm.go(Screen.EventConfig)
         })
     }
 }
