@@ -540,16 +540,18 @@ fun EventCameraScreen(vm: AppViewModel) {
         }
 
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+            val areaW = maxWidth
+            val areaH = maxHeight
             Box(contentAlignment = Alignment.Center) {
                 if (custom != null && customImage != null) {
                     val ratio = custom.width.toFloat() / custom.height
-                    val w = minOf(maxWidth, maxHeight * ratio)
+                    val w = minOf(areaW, areaH * ratio)
                     Box(Modifier.width(w).aspectRatio(ratio).background(Color.White)) {
                         if (granted) CameraPreview(front, false, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
                         Image(customImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
                     }
                 } else {
-                    val w = minOf(maxWidth, (maxHeight - 90.dp) * 0.75f)
+                    val w = minOf(areaW, (areaH - 90.dp) * 0.75f)
                     FramedBox(c.frame, c.caption.ifBlank { null }, Modifier.width(w)) {
                         if (granted) CameraPreview(front, false, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
                     }
