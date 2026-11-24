@@ -58,6 +58,7 @@ class EventStore(private val ctx: Context) {
             caption = prefs.getString("caption", null) ?: d.caption,
             frame = runCatching { FrameStyle.valueOf(prefs.getString("frame", null) ?: "") }.getOrDefault(d.frame),
             useCustomFrame = prefs.getBoolean("custom", false) && frameFile.exists(),
+            format = runCatching { OutputFormat.valueOf(prefs.getString("format", null) ?: "") }.getOrDefault(d.format),
             paper = runCatching { PaperSize.valueOf(prefs.getString("paper", null) ?: "") }.getOrDefault(d.paper),
             landscape = prefs.getBoolean("landscape", d.landscape),
             fill = prefs.getBoolean("fill", d.fill),
@@ -77,6 +78,7 @@ class EventStore(private val ctx: Context) {
             .putString("caption", c.caption)
             .putString("frame", c.frame.name)
             .putBoolean("custom", c.useCustomFrame)
+            .putString("format", c.format.name)
             .putString("paper", c.paper.name)
             .putBoolean("landscape", c.landscape)
             .putBoolean("fill", c.fill)

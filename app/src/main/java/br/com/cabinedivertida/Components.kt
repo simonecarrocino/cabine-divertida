@@ -22,7 +22,9 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -245,6 +247,32 @@ fun PaperGrid(selected: PaperSize, onSelect: (PaperSize) -> Unit) {
     }
 }
 
+/** Faixa de formatos (Instagram e foto) para rolar de lado. */
+@Composable
+fun FormatChips(selected: OutputFormat, onSelect: (OutputFormat) -> Unit, modifier: Modifier = Modifier, dark: Boolean = false) {
+    Row(
+        modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutputFormat.entries.forEach { f ->
+            val on = f == selected
+            val idle = if (dark) Color.White else Cores.BordoEscuro
+            Surface(
+                onClick = { onSelect(f) },
+                shape = RoundedCornerShape(14.dp),
+                color = if (on) (if (dark) Cores.Amarelo else Cores.Bordo) else Color.Transparent,
+                contentColor = if (on) (if (dark) Cores.BordoEscuro else Color.White) else idle,
+                border = BorderStroke(1.5.dp, if (on) Color.Transparent else idle.copy(alpha = 0.35f)),
+            ) {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(f.label, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(f.hint, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}
+
 /** Miniatura de moldura para escolher. */
 @Composable
 fun FrameThumb(style: FrameStyle, selected: Boolean, onClick: () -> Unit) {
@@ -275,6 +303,7 @@ fun FramedBox(
     caption: String?,
     modifier: Modifier = Modifier,
     small: Boolean = false,
+    photoAspect: Float = 3f / 4f,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val k = if (small) 0.2f else 1f
@@ -292,7 +321,7 @@ fun FramedBox(
             .drawBehind { decorate(style, k) }
             .padding(pad),
     ) {
-        Box(Modifier.fillMaxWidth().aspectRatio(3f / 4f).clipToBounds(), content = content)
+        Box(Modifier.fillMaxWidth().aspectRatio(photoAspect).clipToBounds(), content = content)
         if (showCaption) {
             Box(Modifier.fillMaxWidth().height(40.dp * k), contentAlignment = Alignment.Center) {
                 if (!small && !caption.isNullOrBlank()) {

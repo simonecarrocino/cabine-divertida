@@ -150,7 +150,7 @@ fun CameraScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.weight(1f))
             Text(
-                "Moldura: ${vm.frame.label}",
+                "${vm.frame.label} · ${vm.format.label}",
                 color = Color.White,
                 fontSize = 14.sp,
                 modifier = Modifier.background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(20.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
@@ -168,8 +168,9 @@ fun CameraScreen(vm: AppViewModel) {
         }
 
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
-            val w = minOf(maxWidth, (maxHeight - 90.dp) * 0.75f)
-            FramedBox(vm.frame, vm.caption.ifBlank { null }, Modifier.width(w)) {
+            val w = minOf(maxWidth, maxHeight * vm.format.aspect)
+            val aspect = FrameRenderer.photoAspect(vm.frame, vm.caption.ifBlank { null }, vm.format)
+            FramedBox(vm.frame, vm.caption.ifBlank { null }, Modifier.width(w), photoAspect = aspect) {
                 if (granted) {
                     CameraPreview(front, flash, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
                 } else {
@@ -178,6 +179,7 @@ fun CameraScreen(vm: AppViewModel) {
             }
         }
 
+        FormatChips(vm.format, { vm.chooseFormat(it) }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), dark = true)
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -233,8 +235,8 @@ fun FrameScreen(vm: AppViewModel) {
     val scope = rememberCoroutineScope()
     var preview by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
-    LaunchedEffect(vm.photo, vm.frame, vm.caption) {
-        preview = vm.buildFinal(forEvent = false, width = 900)
+    LaunchedEffect(vm.photo, vm.frame, vm.caption, vm.format) {
+        preview = vm.buildFinal(forEvent = false, maxSide = 1000)
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -247,6 +249,8 @@ fun FrameScreen(vm: AppViewModel) {
                 CircularProgressIndicator(color = Cores.Bordo)
             }
         }
+        SectionLabel("Formato", Modifier.padding(horizontal = 24.dp))
+        FormatChips(vm.format, { vm.chooseFormat(it) }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp))
         SectionLabel("Molduras", Modifier.padding(horizontal = 24.dp))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -446,6 +450,14 @@ fun EventConfigScreen(vm: AppViewModel) {
                 color = Cores.Texto2,
             )
 
+            SectionLabel("Formato da foto")
+            FormatChips(c.format, { f -> vm.updateEvent(c.copy(format = f, paper = f.paper ?: c.paper)) })
+            Text(
+                "Story e Reels: 9:16 · Post: 4:5 · Quadrado: 1:1. Nos formatos de foto, o papel da impressão já acompanha.",
+                fontSize = 13.sp,
+                color = Cores.Texto2,
+            )
+
             SectionLabel("Impressão")
             PaperGrid(c.paper) { vm.updateEvent(c.copy(paper = it)) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -529,7 +541,11 @@ fun EventCameraScreen(vm: AppViewModel) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(c.name, color = Cores.Amarelo, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text("Impressão ${c.paper.label} · ${copiesText(c.copies)}", color = Cores.AmareloSuave, fontSize = 13.sp)
+                Text(
+                    "Formato ${c.format.label}" + if (c.allowPrint) " · impressão ${c.paper.label}" else "",
+                    color = Cores.AmareloSuave,
+                    fontSize = 13.sp,
+                )
             }
             IconButton(onClick = { front = !front; capture = null }) {
                 Icon(Icons.Rounded.Cameraswitch, contentDescription = "Trocar câmera", tint = Color.White)
@@ -544,15 +560,16 @@ fun EventCameraScreen(vm: AppViewModel) {
             val areaH = maxHeight
             Box(contentAlignment = Alignment.Center) {
                 if (custom != null && customImage != null) {
-                    val ratio = custom.width.toFloat() / custom.height
+                    val ratio = c.format.aspect
                     val w = minOf(areaW, areaH * ratio)
                     Box(Modifier.width(w).aspectRatio(ratio).background(Color.White)) {
                         if (granted) CameraPreview(front, false, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
-                        Image(customImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
+                        Image(customImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     }
                 } else {
-                    val w = minOf(areaW, (areaH - 90.dp) * 0.75f)
-                    FramedBox(c.frame, c.caption.ifBlank { null }, Modifier.width(w)) {
+                    val w = minOf(areaW, areaH * c.format.aspect)
+                    val aspect = FrameRenderer.photoAspect(c.frame, c.caption.ifBlank { null }, c.format)
+                    FramedBox(c.frame, c.caption.ifBlank { null }, Modifier.width(w), photoAspect = aspect) {
                         if (granted) CameraPreview(front, false, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
                     }
                 }

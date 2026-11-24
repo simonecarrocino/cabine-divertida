@@ -6,48 +6,69 @@ import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
-/** Junta a foto e a moldura numa imagem final em alta resolução. */
+/** Junta a foto e a moldura numa imagem final, no formato escolhido. */
 object FrameRenderer {
-
-    private const val PHOTO_ASPECT = 3f / 4f // largura / altura
 
     fun cropToAspect(src: Bitmap, aspect: Float): Bitmap {
         val w = src.width
         val h = src.height
         return if (w.toFloat() / h > aspect) {
-            val nw = (h * aspect).toInt().coerceAtLeast(1)
+            val nw = (h * aspect).toInt().coerceIn(1, w)
             Bitmap.createBitmap(src, (w - nw) / 2, 0, nw, h)
         } else {
-            val nh = (w / aspect).toInt().coerceAtLeast(1)
+            val nh = (w / aspect).toInt().coerceIn(1, h)
             Bitmap.createBitmap(src, 0, (h - nh) / 2, w, nh)
         }
     }
 
-    fun render(photo: Bitmap, style: FrameStyle, caption: String?, width: Int = 1800): Bitmap {
-        val w = width.toFloat()
-        val side = when (style) {
-            FrameStyle.POLAROID -> w * 0.05f
-            FrameStyle.CLASSICA -> w * 0.09f
-            FrameStyle.FESTA -> w * 0.07f
-            FrameStyle.NATUREZA -> w * 0.08f
-            FrameStyle.SIMPLES -> w * 0.025f
-        }
-        val captionArea = when {
-            style == FrameStyle.POLAROID -> w * 0.16f
-            !caption.isNullOrBlank() -> w * 0.11f
-            else -> 0f
-        }
-        val photoW = w - 2 * side
-        val photoH = photoW / PHOTO_ASPECT
-        val h = side * 2 + photoH + captionArea
+    /** Tamanho em pixels do formato, limitado para não estourar a memória do celular. */
+    fun targetSize(format: OutputFormat, maxSide: Int): Pair<Int, Int> {
+        val s = min(1f, maxSide.toFloat() / max(format.widthPx, format.heightPx))
+        return (format.widthPx * s).roundToInt().coerceAtLeast(1) to (format.heightPx * s).roundToInt().coerceAtLeast(1)
+    }
 
-        val out = Bitmap.createBitmap(width, h.toInt(), Bitmap.Config.ARGB_8888)
+    /** Margem da moldura em fração da largura. */
+    private fun sideFraction(style: FrameStyle) = when (style) {
+        FrameStyle.POLAROID -> 0.05f
+        FrameStyle.CLASSICA -> 0.09f
+        FrameStyle.FESTA -> 0.07f
+        FrameStyle.NATUREZA -> 0.08f
+        FrameStyle.SIMPLES -> 0.025f
+    }
+
+    /** Faixa da legenda embaixo, em fração da largura. */
+    private fun captionFraction(style: FrameStyle, caption: String?) = when {
+        style == FrameStyle.POLAROID -> 0.16f
+        !caption.isNullOrBlank() -> 0.11f
+        else -> 0f
+    }
+
+    /** Proporção (largura/altura) da área da foto dentro da moldura — usada no visor da câmera. */
+    fun photoAspect(style: FrameStyle, caption: String?, format: OutputFormat): Float {
+        val s = sideFraction(style)
+        val c = captionFraction(style, caption)
+        val pw = 1f - 2 * s
+        val ph = 1f / format.aspect - 2 * s - c
+        return (pw / ph).coerceIn(0.2f, 5f)
+    }
+
+    fun render(photo: Bitmap, style: FrameStyle, caption: String?, format: OutputFormat, maxSide: Int = 3000): Bitmap {
+        val (width, height) = targetSize(format, maxSide)
+        val w = width.toFloat()
+        val h = height.toFloat()
+        val side = w * sideFraction(style)
+        val captionArea = w * captionFraction(style, caption)
+
+        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(style.background.toInt())
 
-        val dst = RectF(side, side, side + photoW, side + photoH)
-        canvas.drawBitmap(cropToAspect(photo, PHOTO_ASPECT), null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
+        val dst = RectF(side, side, w - side, h - side - captionArea)
+        canvas.drawBitmap(cropToAspect(photo, dst.width() / dst.height()), null, dst, Paint(Paint.FILTER_BITMAP_FLAG))
 
         val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.style = Paint.Style.STROKE }
         when (style) {
@@ -83,7 +104,6 @@ object FrameRenderer {
                 typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 textSize = w * 0.05f
             }
-            // Diminui a letra se o texto for comprido demais.
             val maxText = w - 2 * side
             while (text.measureText(caption) > maxText && text.textSize > w * 0.025f) {
                 text.textSize *= 0.92f
@@ -94,16 +114,20 @@ object FrameRenderer {
         return out
     }
 
-    /** Moldura própria (PNG com o meio transparente): a foto fica por trás da arte. */
-    fun renderCustom(photo: Bitmap, frame: Bitmap, width: Int = 1800): Bitmap {
-        val h = (width.toFloat() * frame.height / frame.width).toInt().coerceAtLeast(1)
-        val out = Bitmap.createBitmap(width, h, Bitmap.Config.ARGB_8888)
+    /**
+     * Moldura própria (PNG com o meio transparente): a foto fica por trás da arte.
+     * Se a arte tiver outra proporção, ela é recortada pelo centro para caber no formato.
+     */
+    fun renderCustom(photo: Bitmap, frame: Bitmap, format: OutputFormat, maxSide: Int = 3000): Bitmap {
+        val (width, height) = targetSize(format, maxSide)
+        val aspect = width.toFloat() / height
+        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(out)
         canvas.drawColor(0xFFFFFFFF.toInt())
-        val full = RectF(0f, 0f, width.toFloat(), h.toFloat())
+        val full = RectF(0f, 0f, width.toFloat(), height.toFloat())
         val paint = Paint(Paint.FILTER_BITMAP_FLAG)
-        canvas.drawBitmap(cropToAspect(photo, width.toFloat() / h), null, full, paint)
-        canvas.drawBitmap(frame, null, full, paint)
+        canvas.drawBitmap(cropToAspect(photo, aspect), null, full, paint)
+        canvas.drawBitmap(cropToAspect(frame, aspect), null, full, paint)
         return out
     }
 }

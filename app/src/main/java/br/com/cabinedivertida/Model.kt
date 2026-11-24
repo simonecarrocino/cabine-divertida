@@ -31,12 +31,32 @@ enum class PaperSize(val label: String, val hint: String, val widthCm: Float, va
     private fun cmToMils(cm: Float): Int = (cm / 2.54f * 1000f).roundToInt()
 }
 
+/**
+ * Formato da imagem final. Os do Instagram seguem o tamanho recomendado (1080 px de largura);
+ * os de foto saem em 300 dpi e já escolhem o papel correspondente.
+ */
+enum class OutputFormat(val label: String, val hint: String, val widthPx: Int, val heightPx: Int, val paper: PaperSize?) {
+    STORY("Story", "Instagram 9:16", 1080, 1920, null),
+    REELS("Reels", "Instagram 9:16", 1080, 1920, null),
+    POST("Post", "Instagram 4:5", 1080, 1350, null),
+    QUADRADO("Quadrado", "Instagram 1:1", 1080, 1080, null),
+    F10X15("10×15", "Foto", 1181, 1772, PaperSize.P10X15),
+    F13X18("13×18", "Foto", 1535, 2126, PaperSize.P13X18),
+    F15X21("15×21", "Foto", 1772, 2480, PaperSize.P15X21),
+    F20X25("20×25", "Foto", 2362, 2953, PaperSize.P20X25),
+    F20X30("20×30", "Foto", 2362, 3543, PaperSize.P20X30),
+    A4("A4", "Foto", 2480, 3508, PaperSize.A4);
+
+    val aspect: Float get() = widthPx.toFloat() / heightPx
+}
+
 /** Configuração do Modo Evento, definida uma vez pela organizadora. */
 data class EventConfig(
     val name: String = "Meu evento",
     val caption: String = "",
     val frame: FrameStyle = FrameStyle.POLAROID,
     val useCustomFrame: Boolean = false,
+    val format: OutputFormat = OutputFormat.F10X15,
     val paper: PaperSize = PaperSize.P10X15,
     val landscape: Boolean = false,
     val fill: Boolean = true,

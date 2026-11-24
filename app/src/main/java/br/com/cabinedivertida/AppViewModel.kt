@@ -37,6 +37,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var photo by mutableStateOf<Bitmap?>(null)
     var frame by mutableStateOf(FrameStyle.POLAROID)
     var caption by mutableStateOf("")
+    var format by mutableStateOf(OutputFormat.F10X15)
     var finalImage by mutableStateOf<Bitmap?>(null)
 
     // Opções de impressão do modo normal
@@ -76,21 +77,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Monta a imagem final (foto + moldura). */
-    suspend fun buildFinal(forEvent: Boolean, width: Int = 1800): Bitmap? {
+    /** Escolhe o formato; os de foto já escolhem o papel correspondente. */
+    fun chooseFormat(f: OutputFormat) {
+        format = f
+        f.paper?.let { paper = it }
+    }
+
+    suspend fun buildFinal(forEvent: Boolean, maxSide: Int = 3000): Bitmap? {
         val p = photo ?: return null
         val ev = event
         val cf = customFrame
         val style = frame
         val text = caption
+        val fmt = format
         return withContext(Dispatchers.Default) {
             if (forEvent) {
                 if (ev.useCustomFrame && cf != null) {
-                    FrameRenderer.renderCustom(p, cf, width)
+                    FrameRenderer.renderCustom(p, cf, ev.format, maxSide)
                 } else {
-                    FrameRenderer.render(p, ev.frame, ev.caption.ifBlank { null }, width)
+                    FrameRenderer.render(p, ev.frame, ev.caption.ifBlank { null }, ev.format, maxSide)
                 }
             } else {
-                FrameRenderer.render(p, style, text.ifBlank { null }, width)
+                FrameRenderer.render(p, style, text.ifBlank { null }, fmt, maxSide)
             }
         }
     }
