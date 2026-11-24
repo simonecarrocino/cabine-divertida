@@ -144,6 +144,7 @@ class EventStore(private val ctx: Context) {
         put("createdAt", c.createdAt)
         put("name", c.name)
         put("frontCamera", c.frontCamera)
+        put("timer", c.timer)
         put("caption", c.caption)
         put("frame", c.frame.name)
         put("useCustomFrame", c.useCustomFrame)
@@ -168,6 +169,7 @@ class EventStore(private val ctx: Context) {
             createdAt = o.optLong("createdAt", d.createdAt),
             name = o.optString("name", d.name),
             frontCamera = o.optBoolean("frontCamera", d.frontCamera),
+            timer = o.optInt("timer", d.timer),
             caption = o.optString("caption", d.caption),
             frame = enumOr(o.optString("frame"), d.frame),
             useCustomFrame = o.optBoolean("useCustomFrame", false) && hasCustomFrame(id),

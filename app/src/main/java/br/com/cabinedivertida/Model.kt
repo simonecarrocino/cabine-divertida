@@ -40,12 +40,7 @@ enum class OutputFormat(val label: String, val hint: String, val widthPx: Int, v
     REELS("Reels", "Instagram 9:16", 1080, 1920, null),
     POST("Post", "Instagram 4:5", 1080, 1350, null),
     QUADRADO("Quadrado", "Instagram 1:1", 1080, 1080, null),
-    F10X15("10×15", "Foto", 1181, 1772, PaperSize.P10X15),
-    F13X18("13×18", "Foto", 1535, 2126, PaperSize.P13X18),
-    F15X21("15×21", "Foto", 1772, 2480, PaperSize.P15X21),
-    F20X25("20×25", "Foto", 2362, 2953, PaperSize.P20X25),
-    F20X30("20×30", "Foto", 2362, 3543, PaperSize.P20X30),
-    A4("A4", "Foto", 2480, 3508, PaperSize.A4);
+    F10X15("10×15", "Foto", 1181, 1772, PaperSize.P10X15);
 
     val aspect: Float get() = widthPx.toFloat() / heightPx
 }
@@ -56,6 +51,8 @@ data class EventConfig(
     val createdAt: Long = System.currentTimeMillis(),
     val name: String = "Meu evento",
     val frontCamera: Boolean = true,
+    /** Segundos de contagem antes da foto; 0 = sem timer. */
+    val timer: Int = 3,
     val caption: String = "",
     val frame: FrameStyle = FrameStyle.POLAROID,
     val useCustomFrame: Boolean = false,

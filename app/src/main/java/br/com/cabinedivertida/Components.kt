@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package br.com.cabinedivertida
 
@@ -254,9 +254,10 @@ fun PaperGrid(selected: PaperSize, onSelect: (PaperSize) -> Unit) {
 /** Faixa de formatos (Instagram e foto) para rolar de lado. */
 @Composable
 fun FormatChips(selected: OutputFormat, onSelect: (OutputFormat) -> Unit, modifier: Modifier = Modifier, dark: Boolean = false) {
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
+    FlowRow(
+        modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         OutputFormat.entries.forEach { f ->
             val on = f == selected
@@ -268,9 +269,8 @@ fun FormatChips(selected: OutputFormat, onSelect: (OutputFormat) -> Unit, modifi
                 contentColor = if (on) (if (dark) Cores.BordoEscuro else Color.White) else idle,
                 border = BorderStroke(1.5.dp, if (on) Color.Transparent else idle.copy(alpha = 0.35f)),
             ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(f.label, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text(f.hint, fontSize = 11.sp)
+                Box(Modifier.heightIn(min = 44.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+                    Text(f.label, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

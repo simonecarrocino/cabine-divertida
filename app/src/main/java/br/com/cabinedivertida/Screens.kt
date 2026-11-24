@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 
 package br.com.cabinedivertida
 
@@ -423,6 +423,15 @@ fun EventConfigScreen(vm: AppViewModel) {
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            SectionLabel("Timer da foto")
+            val timers = listOf(0, 3, 5, 10)
+            Segmented(
+                listOf("Sem timer", "3 s", "5 s", "10 s"),
+                timers.indexOf(c.timer).coerceAtLeast(0),
+                { vm.updateEvent(c.copy(timer = timers[it])) },
+                Modifier.fillMaxWidth(),
+            )
+
             SectionLabel("Câmera que abre primeiro")
             Segmented(
                 listOf("Frontal (selfie)", "Traseira"),
@@ -432,7 +441,7 @@ fun EventConfigScreen(vm: AppViewModel) {
             )
 
             SectionLabel("Moldura do evento")
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 FrameStyle.entries.forEach { f ->
                     FrameThumb(f, !c.useCustomFrame && c.frame == f) { vm.updateEvent(c.copy(frame = f, useCustomFrame = false)) }
                 }
@@ -632,7 +641,7 @@ fun EventCameraScreen(vm: AppViewModel) {
                     val cap = capture ?: return@ShutterButton
                     busy = true
                     scope.launch {
-                        for (i in 3 downTo 1) {
+                        for (i in c.timer downTo 1) {
                             countdown = i
                             delay(1000)
                         }
@@ -676,6 +685,7 @@ fun EventResultScreen(vm: AppViewModel) {
     var phone by remember { mutableStateOf("") }
     var showIg by remember { mutableStateOf(false) }
     var handle by remember { mutableStateOf("") }
+    var askExit by remember { mutableStateOf(false) }
 
     fun doPrint() {
         val a = ctx.findActivity()
@@ -699,9 +709,18 @@ fun EventResultScreen(vm: AppViewModel) {
     }
 
     Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Column {
-            Text(if (reviewing) "Foto do evento" else "Que foto linda!", color = Cores.Bordo, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text(c.name, color = Cores.Texto2, fontSize = 14.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(if (reviewing) "Foto do evento" else "Que foto linda!", color = Cores.Bordo, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text(c.name, color = Cores.Texto2, fontSize = 14.sp)
+            }
+            if (!reviewing) {
+                TextButton(onClick = { askExit = true }) {
+                    Icon(Icons.Rounded.Lock, contentDescription = null, tint = Cores.Texto2, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Sair do evento", color = Cores.Texto2, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
             if (img != null) {
@@ -800,18 +819,18 @@ fun EventResultScreen(vm: AppViewModel) {
                 )
             }
         }
-        if (c.allowPrint) {
-            BigButton("Imprimir", { doPrint() }, icon = Icons.Rounded.Print, container = Cores.Amarelo, contentColor = Cores.BordoEscuro, height = 60.dp)
-        }
         if (c.allowWhats || c.allowInstagram) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (c.allowWhats) {
-                    BigButton("WhatsApp", { showPhone = !showPhone; showIg = false }, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Rounded.Chat, container = Cores.Whats, height = 60.dp)
-                }
                 if (c.allowInstagram) {
                     BigButton("Instagram", { showIg = !showIg; showPhone = false }, modifier = Modifier.weight(1f), icon = Icons.Rounded.CameraAlt, container = Cores.Bordo, height = 60.dp)
                 }
+                if (c.allowWhats) {
+                    BigButton("WhatsApp", { showPhone = !showPhone; showIg = false }, modifier = Modifier.weight(1f), icon = Icons.AutoMirrored.Rounded.Chat, container = Cores.Whats, height = 60.dp)
+                }
             }
+        }
+        if (c.allowPrint) {
+            BigButton("Imprimir", { doPrint() }, icon = Icons.Rounded.Print, container = Cores.Amarelo, contentColor = Cores.BordoEscuro, height = 60.dp)
         }
         if (reviewing) {
             OutlineBigButton("Voltar às fotos", {
@@ -826,6 +845,17 @@ fun EventResultScreen(vm: AppViewModel) {
                 vm.reset(Screen.EventCamera)
             }, icon = Icons.Rounded.PhotoCamera)
         }
+    }
+
+    if (askExit) {
+        PinDialog(c.pin, onDismiss = { askExit = false }, onOk = {
+            askExit = false
+            vm.photo = null
+            vm.finalImage = null
+            vm.reset(Screen.Home)
+            vm.go(Screen.Events)
+            vm.go(Screen.EventConfig)
+        })
     }
 }
 
