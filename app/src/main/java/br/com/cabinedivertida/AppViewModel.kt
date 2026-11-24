@@ -61,7 +61,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         eventStore.save(c)
     }
 
-    fun setCustomFrame(b: Bitmap) {
+    fun useCustomFrame(b: Bitmap) {
         eventStore.saveCustomFrame(b)
         customFrame = b
         updateEvent(event.copy(useCustomFrame = true))

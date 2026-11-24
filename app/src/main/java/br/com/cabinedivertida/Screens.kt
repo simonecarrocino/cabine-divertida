@@ -391,7 +391,7 @@ fun PrintScreen(vm: AppViewModel) {
 @Composable
 fun EventConfigScreen(vm: AppViewModel) {
     val c = vm.event
-    val pickFrame = rememberGalleryPicker { b -> vm.setCustomFrame(b) }
+    val pickFrame = rememberGalleryPicker { b -> vm.useCustomFrame(b) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         TopBar("Configurar evento", onBack = { vm.back() })
