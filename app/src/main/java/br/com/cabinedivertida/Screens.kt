@@ -46,77 +46,120 @@ private fun copiesText(n: Int) = if (n == 1) "1 cópia" else "$n cópias"
 
 @Composable
 fun HomeScreen(vm: AppViewModel) {
-    val ctx = LocalContext.current
-    val openGallery = rememberGalleryPicker { b ->
-        vm.photo = b
-        vm.go(Screen.Frame)
-    }
     val openFiles = rememberFileImagePicker { b ->
         vm.photo = b
         vm.go(Screen.Frame)
     }
-    var recents by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
-    LaunchedEffect(Unit) {
-        recents = withContext(Dispatchers.IO) {
-            Recents.list(ctx).take(3).mapNotNull { Images.loadFile(it, 400) }
-        }
+    val recent = vm.events.take(3)
+    var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    LaunchedEffect(vm.events) {
+        counts = withContext(Dispatchers.IO) { recent.associate { it.id to vm.eventPhotos(it).size } }
     }
+    val dateFmt = remember { java.text.SimpleDateFormat("dd/MM", java.util.Locale("pt", "BR")) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(22.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        // Cabeçalho
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Image(
                 painterResource(R.drawable.logo_cabine),
-                contentDescription = "Cabine Divertida",
-                modifier = Modifier.width(210.dp),
+                contentDescription = null,
+                modifier = Modifier.width(76.dp),
                 contentScale = ContentScale.FillWidth,
             )
-            Text(
-                "Tire a foto, escolha a moldura e envie pelo WhatsApp ou imprima.",
-                color = Cores.Texto2,
-                fontSize = 16.sp,
-                textAlign = TextAlign.Center,
-            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text("Cabine Divertida", color = Cores.Bordo, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Fotos com moldura para eventos", color = Cores.Texto2, fontSize = 14.sp)
+            }
         }
 
-        // Cartão principal
+        // ----- Modo Evento (o principal) -----
         Column(
             Modifier.fillMaxWidth()
                 .border(2.dp, Cores.Bordo, RoundedCornerShape(24.dp))
                 .background(Color.White, RoundedCornerShape(24.dp))
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            BigButton("Tirar foto", { vm.go(Screen.Camera) }, icon = Icons.Rounded.PhotoCamera)
-            OutlineBigButton("Escolher da galeria", openGallery, icon = Icons.Rounded.PhotoLibrary)
-            OutlineBigButton("Do Google Drive ou arquivos", openFiles, icon = Icons.Rounded.CloudDownload)
-        }
-
-        // Modo Evento
-        Surface(
-            onClick = { vm.go(Screen.Events) },
-            shape = RoundedCornerShape(16.dp),
-            color = Cores.Amarelo,
-            contentColor = Cores.BordoEscuro,
-        ) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Celebration, contentDescription = null, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Modo Evento", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    Text("Moldura e tamanho fixos para festas", fontSize = 13.sp, color = Cores.Bordo)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Celebration, contentDescription = null, tint = Cores.Bordo, modifier = Modifier.size(26.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Modo Evento", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Cores.BordoEscuro, modifier = Modifier.weight(1f))
+                if (vm.events.isNotEmpty()) {
+                    TextButton(onClick = { vm.go(Screen.Events) }) {
+                        Text(if (vm.events.size > 3) "Ver todos (${vm.events.size})" else "Ver todos", color = Cores.Bordo, fontWeight = FontWeight.SemiBold)
+                    }
                 }
-                Icon(Icons.Rounded.ChevronRight, contentDescription = null)
             }
+            if (recent.isEmpty()) {
+                Text(
+                    "Crie seu primeiro evento: você define moldura, formato e impressão uma vez, e depois é só fotografar.",
+                    color = Cores.Texto2,
+                    fontSize = 14.sp,
+                )
+            } else {
+                Text("Últimos eventos", color = Cores.Texto2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
+            recent.forEach { e ->
+                val n = counts[e.id] ?: 0
+                Row(
+                    Modifier.fillMaxWidth().background(Cores.Fundo, RoundedCornerShape(14.dp)).padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(e.name, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Cores.BordoEscuro, maxLines = 1)
+                        Text(
+                            "${e.format.label} · ${if (n == 1) "1 foto" else "$n fotos"} · ${dateFmt.format(java.util.Date(e.createdAt))}",
+                            fontSize = 12.sp,
+                            color = Cores.Texto2,
+                            maxLines = 1,
+                        )
+                    }
+                    IconButton(onClick = { vm.openEvent(e); vm.go(Screen.EventConfig) }) {
+                        Icon(Icons.Rounded.Edit, contentDescription = "Editar ${e.name}", tint = Cores.Texto2)
+                    }
+                    Button(
+                        onClick = { vm.openEvent(e); vm.reset(Screen.EventCamera) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Cores.Bordo, contentColor = Color.White),
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                        modifier = Modifier.height(44.dp),
+                    ) {
+                        Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Iniciar", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            BigButton(
+                "Novo evento",
+                { vm.newEvent(); vm.go(Screen.EventConfig) },
+                icon = Icons.Rounded.Add,
+                container = Cores.Amarelo,
+                contentColor = Cores.BordoEscuro,
+                height = 54.dp,
+            )
         }
 
-        // Prompts para criar molduras com IA
+        // ----- Foto individual -----
+        Column(
+            Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(24.dp)).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.PhotoCamera, contentDescription = null, tint = Cores.Bordo, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Foto individual", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Cores.BordoEscuro)
+            }
+            Text("Uma foto avulsa, com a moldura que você quiser.", color = Cores.Texto2, fontSize = 14.sp)
+            BigButton("Tirar foto", { vm.go(Screen.Camera) }, icon = Icons.Rounded.PhotoCamera, height = 54.dp)
+            OutlineBigButton("Galeria ou Google Drive", openFiles, icon = Icons.Rounded.PhotoLibrary)
+        }
+
+        // ----- Prompts para moldura -----
         Surface(
             onClick = { vm.go(Screen.Prompts) },
             shape = RoundedCornerShape(16.dp),
@@ -125,30 +168,13 @@ fun HomeScreen(vm: AppViewModel) {
             border = BorderStroke(2.dp, Cores.Amarelo),
         ) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(28.dp), tint = Cores.Bordo)
+                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(26.dp), tint = Cores.Bordo)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Prompts para moldura", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Text("Peça a arte para a IA no tamanho certo", fontSize = 13.sp, color = Cores.Texto2)
                 }
                 Icon(Icons.Rounded.ChevronRight, contentDescription = null)
-            }
-        }
-
-        if (recents.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Recentes", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Cores.BordoEscuro)
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    recents.forEach { b ->
-                        Image(
-                            b.asImageBitmap(),
-                            contentDescription = "Foto recente",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.weight(1f).aspectRatio(0.8f).shadow(3.dp).background(Color.White),
-                        )
-                    }
-                    repeat(3 - recents.size) { Spacer(Modifier.weight(1f)) }
-                }
             }
         }
     }
@@ -176,7 +202,7 @@ fun CameraScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.weight(1f))
             Text(
-                "${vm.frame.label} · ${vm.format.label}",
+                "${if (vm.indivFrame != null) "Moldura salva" else vm.frame.label} · ${vm.format.label}",
                 color = Color.White,
                 fontSize = 14.sp,
                 modifier = Modifier.background(Color.White.copy(alpha = 0.14f), RoundedCornerShape(20.dp)).padding(horizontal = 14.dp, vertical = 8.dp),
@@ -195,12 +221,21 @@ fun CameraScreen(vm: AppViewModel) {
 
         BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
             val w = minOf(maxWidth, maxHeight * vm.format.aspect)
-            val aspect = FrameRenderer.photoAspect(vm.frame, vm.caption.ifBlank { null }, vm.format)
-            FramedBox(vm.frame, vm.caption.ifBlank { null }, Modifier.width(w), photoAspect = aspect) {
-                if (granted) {
-                    CameraPreview(front, flash, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
-                } else {
-                    Text("Permita o uso da câmera para tirar fotos.", color = Cores.BordoEscuro, modifier = Modifier.align(Alignment.Center).padding(16.dp))
+            val own = vm.indivFrame
+            val ownImage = remember(own) { own?.asImageBitmap() }
+            if (own != null && ownImage != null) {
+                Box(Modifier.width(w).aspectRatio(vm.format.aspect).background(Color.White)) {
+                    if (granted) CameraPreview(front, flash, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
+                    Image(ownImage, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
+            } else {
+                val aspect = FrameRenderer.photoAspect(vm.frame, vm.caption.ifBlank { null }, vm.format)
+                FramedBox(vm.frame, vm.caption.ifBlank { null }, Modifier.width(w), photoAspect = aspect) {
+                    if (granted) {
+                        CameraPreview(front, flash, onReady = { capture = it }, modifier = Modifier.fillMaxSize())
+                    } else {
+                        Text("Permita o uso da câmera para tirar fotos.", color = Cores.BordoEscuro, modifier = Modifier.align(Alignment.Center).padding(16.dp))
+                    }
                 }
             }
         }
@@ -211,9 +246,9 @@ fun CameraScreen(vm: AppViewModel) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             FrameStyle.entries.forEach { f ->
-                val on = f == vm.frame
+                val on = f == vm.frame && vm.indivFrame == null
                 Surface(
-                    onClick = { vm.frame = f },
+                    onClick = { vm.chooseStyle(f) },
                     shape = RoundedCornerShape(22.dp),
                     color = if (on) Cores.Amarelo else Color.Transparent,
                     contentColor = if (on) Cores.BordoEscuro else Color.White,
@@ -259,9 +294,10 @@ fun CameraScreen(vm: AppViewModel) {
 @Composable
 fun FrameScreen(vm: AppViewModel) {
     val scope = rememberCoroutineScope()
+    val uploadFrame = rememberFileImagePicker { b -> vm.uploadIndividualFrame(b) }
     var preview by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
-    LaunchedEffect(vm.photo, vm.frame, vm.caption, vm.format) {
+    LaunchedEffect(vm.photo, vm.frame, vm.caption, vm.format, vm.indivFrame) {
         preview = vm.buildFinal(forEvent = false, maxSide = 1000)
     }
 
@@ -282,15 +318,28 @@ fun FrameScreen(vm: AppViewModel) {
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            FrameStyle.entries.forEach { f -> FrameThumb(f, f == vm.frame) { vm.frame = f } }
+            UploadFrameTile(uploadFrame)
+            vm.libraryFrames.forEach { (file, thumb) ->
+                LibraryThumb(thumb, vm.indivFrameFile == file, { vm.chooseLibraryFrame(file) }, { vm.deleteLibraryFrame(file) })
+            }
+            FrameStyle.entries.forEach { f -> FrameThumb(f, f == vm.frame && vm.indivFrame == null) { vm.chooseStyle(f) } }
         }
-        OutlinedTextField(
-            value = vm.caption,
-            onValueChange = { vm.caption = it.take(40) },
-            label = { Text("Legenda (opcional)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-        )
+        if (vm.indivFrame == null) {
+            OutlinedTextField(
+                value = vm.caption,
+                onValueChange = { vm.caption = it.take(40) },
+                label = { Text("Legenda (opcional)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            )
+        } else {
+            Text(
+                "Moldura salva · segure uma moldura salva para apagar",
+                color = Cores.Texto2,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 24.dp),
+            )
+        }
         Row(Modifier.padding(24.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlineBigButton(
                 "Girar",
@@ -468,6 +517,10 @@ fun EventConfigScreen(vm: AppViewModel) {
 
             SectionLabel("Moldura do evento")
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                UploadFrameTile(pickFrame)
+                vm.libraryFrames.forEach { (file, thumb) ->
+                    LibraryThumb(thumb, false, { vm.useLibraryFrameForEvent(file) }, { vm.deleteLibraryFrame(file) })
+                }
                 FrameStyle.entries.forEach { f ->
                     FrameThumb(f, !c.useCustomFrame && c.frame == f) { vm.updateEvent(c.copy(frame = f, useCustomFrame = false)) }
                 }
@@ -483,7 +536,7 @@ fun EventConfigScreen(vm: AppViewModel) {
                             Box(Modifier.width(48.dp).aspectRatio(custom.width.toFloat() / custom.height).background(Color(0xFFCFE3D5))) {
                                 Image(custom.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds)
                             }
-                            Text("Minha arte", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Cores.BordoEscuro, maxLines = 1)
+                            Text("Do evento", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Cores.BordoEscuro, maxLines = 1)
                         }
                     }
                 }

@@ -261,6 +261,50 @@ class EventStore(private val ctx: Context) {
     }
 }
 
+/**
+ * Biblioteca de molduras: toda arte enviada (no evento ou na foto individual) fica guardada aqui
+ * para usar de novo. Arquivos iguais são guardados uma vez só.
+ */
+class FrameLibrary(private val ctx: Context) {
+    private val dir = File(ctx.filesDir, "biblioteca").apply { mkdirs() }
+
+    fun list(): List<File> =
+        dir.listFiles()?.filter { it.extension == "png" }?.sortedByDescending { it.lastModified() } ?: emptyList()
+
+    private fun md5(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("MD5").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    private fun store(bytes: ByteArray): File {
+        val f = File(dir, md5(bytes) + ".png")
+        if (!f.exists()) f.writeBytes(bytes) else f.setLastModified(System.currentTimeMillis())
+        return f
+    }
+
+    fun add(b: Bitmap): File {
+        val out = java.io.ByteArrayOutputStream()
+        b.compress(Bitmap.CompressFormat.PNG, 100, out)
+        return store(out.toByteArray())
+    }
+
+    fun addFile(src: File): File? = if (src.exists()) store(src.readBytes()) else null
+
+    /** Traz para a biblioteca as molduras que já estavam nos eventos. */
+    fun importEventFrames() {
+        File(ctx.filesDir, "molduras").listFiles()?.filter { it.extension == "png" }?.forEach { f ->
+            val bytes = f.readBytes()
+            val target = File(dir, md5(bytes) + ".png")
+            if (!target.exists()) {
+                target.writeBytes(bytes)
+                target.setLastModified(f.lastModified())
+            }
+        }
+    }
+
+    fun delete(f: File) {
+        if (f.parentFile == dir) f.delete()
+    }
+}
+
 /** Últimas fotos feitas no app, para a lista "Recentes". */
 object Recents {
     private fun dir(ctx: Context) = File(ctx.filesDir, "recentes").apply { mkdirs() }

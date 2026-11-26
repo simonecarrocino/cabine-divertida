@@ -62,8 +62,77 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** true quando a tela "foto pronta" foi aberta pela galeria do evento (reenviar/reimprimir). */
     var reviewing by mutableStateOf(false)
 
+    // Biblioteca de molduras (todas as artes já enviadas)
+    private val library = FrameLibrary(app)
+    var libraryFrames by mutableStateOf<List<Pair<java.io.File, Bitmap>>>(emptyList())
+        private set
+
+    // Moldura própria escolhida na foto individual (null = moldura pronta do app)
+    var indivFrameFile by mutableStateOf<java.io.File?>(null)
+        private set
+    var indivFrame by mutableStateOf<Bitmap?>(null)
+        private set
+
     init {
         loadFrameFor(event)
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { runCatching { library.importEventFrames() } }
+            refreshLibrary()
+        }
+    }
+
+    suspend fun refreshLibrary() {
+        libraryFrames = withContext(Dispatchers.IO) {
+            library.list().mapNotNull { f -> Images.loadFile(f, 320)?.let { f to it } }
+        }
+    }
+
+    /** Foto individual: usar uma moldura pronta do app. */
+    fun chooseStyle(s: FrameStyle) {
+        frame = s
+        indivFrameFile = null
+        indivFrame = null
+    }
+
+    /** Foto individual: usar uma moldura da biblioteca. */
+    fun chooseLibraryFrame(f: java.io.File) {
+        viewModelScope.launch {
+            val b = withContext(Dispatchers.IO) { android.graphics.BitmapFactory.decodeFile(f.path) } ?: return@launch
+            indivFrameFile = f
+            indivFrame = b
+        }
+    }
+
+    /** Foto individual: subir uma moldura nova (fica guardada na biblioteca). */
+    fun uploadIndividualFrame(b: Bitmap) {
+        viewModelScope.launch {
+            val ready = withContext(Dispatchers.Default) { FrameTools.autoTransparentWindow(b) }
+            val f = withContext(Dispatchers.IO) { library.add(ready) }
+            refreshLibrary()
+            indivFrameFile = f
+            indivFrame = ready
+        }
+    }
+
+    /** Evento: usar uma moldura da biblioteca. */
+    fun useLibraryFrameForEvent(f: java.io.File) {
+        val id = event.id
+        viewModelScope.launch {
+            val b = withContext(Dispatchers.IO) { android.graphics.BitmapFactory.decodeFile(f.path) } ?: return@launch
+            withContext(Dispatchers.IO) { eventStore.saveCustomFrame(id, b) }
+            if (event.id == id) {
+                customFrame = b
+                updateEvent(event.copy(useCustomFrame = true))
+            }
+        }
+    }
+
+    fun deleteLibraryFrame(f: java.io.File) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { library.delete(f) }
+            if (indivFrameFile == f) chooseStyle(frame)
+            refreshLibrary()
+        }
     }
 
     private fun loadFrameFor(c: EventConfig) {
@@ -114,7 +183,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val id = event.id
         viewModelScope.launch {
             val ready = withContext(Dispatchers.Default) { FrameTools.autoTransparentWindow(b) }
-            withContext(Dispatchers.IO) { eventStore.saveCustomFrame(id, ready) }
+            withContext(Dispatchers.IO) {
+                eventStore.saveCustomFrame(id, ready)
+                library.add(ready)
+            }
+            refreshLibrary()
             if (event.id == id) {
                 customFrame = ready
                 updateEvent(event.copy(useCustomFrame = true))
@@ -165,6 +238,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val style = frame
         val text = caption
         val fmt = format
+        val indiv = indivFrame
         return withContext(Dispatchers.Default) {
             if (forEvent) {
                 if (ev.useCustomFrame && cf != null) {
@@ -172,6 +246,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     FrameRenderer.render(p, ev.frame, ev.caption.ifBlank { null }, ev.format, maxSide)
                 }
+            } else if (indiv != null) {
+                FrameRenderer.renderCustom(p, indiv, fmt, maxSide)
             } else {
                 FrameRenderer.render(p, style, text.ifBlank { null }, fmt, maxSide)
             }

@@ -26,6 +26,10 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -274,6 +278,65 @@ fun FormatChips(selected: OutputFormat, onSelect: (OutputFormat) -> Unit, modifi
                 }
             }
         }
+    }
+}
+
+/**
+ * Miniatura de uma moldura salva (biblioteca). Toque para escolher; segure para apagar da biblioteca.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+fun LibraryThumb(thumb: Bitmap, selected: Boolean, onClick: () -> Unit, onDelete: (() -> Unit)? = null) {
+    var askDelete by remember { mutableStateOf(false) }
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Color.White else Color.Transparent)
+            .border(2.dp, if (selected) Cores.Bordo else Color.Transparent, RoundedCornerShape(12.dp))
+            .combinedClickable(onClick = onClick, onLongClick = if (onDelete != null) ({ askDelete = true }) else null)
+            .padding(8.dp)
+            .width(60.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(Modifier.width(48.dp).aspectRatio(thumb.width.toFloat() / thumb.height).background(Color(0xFFCFE3D5))) {
+            androidx.compose.foundation.Image(
+                thumb.asImageBitmap(),
+                contentDescription = "Moldura salva",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.FillBounds,
+            )
+        }
+        Text("Salva", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Cores.BordoEscuro, maxLines = 1)
+    }
+    if (askDelete && onDelete != null) {
+        AlertDialog(
+            onDismissRequest = { askDelete = false },
+            title = { Text("Apagar esta moldura?") },
+            text = { Text("Ela sai da lista de molduras salvas. Eventos que já usam essa moldura continuam com ela.") },
+            confirmButton = { TextButton(onClick = { askDelete = false; onDelete() }) { Text("Apagar", color = Cores.Erro) } },
+            dismissButton = { TextButton(onClick = { askDelete = false }) { Text("Cancelar") } },
+        )
+    }
+}
+
+/** Botão "+ Subir moldura" no meio da lista de molduras. */
+@Composable
+fun UploadFrameTile(onClick: () -> Unit) {
+    Column(
+        Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClickLabel = "Subir moldura", onClick = onClick)
+            .padding(8.dp)
+            .width(60.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(
+            Modifier.width(48.dp).height(60.dp).border(2.dp, Cores.Bordo, RoundedCornerShape(6.dp)).background(Cores.AmareloSuave, RoundedCornerShape(6.dp)),
+            contentAlignment = Alignment.Center,
+        ) { Icon(Icons.Rounded.Add, contentDescription = null, tint = Cores.Bordo) }
+        Text("Subir", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Cores.BordoEscuro, maxLines = 1)
     }
 }
 
