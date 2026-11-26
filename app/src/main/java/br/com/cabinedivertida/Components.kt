@@ -478,6 +478,25 @@ fun rememberPhonePicker(onPicked: (String) -> Unit): () -> Unit {
     }
 }
 
+/**
+ * Escolhe uma imagem pelo seletor de arquivos do Android, que mostra também o Google Drive
+ * (e outras nuvens instaladas, como OneDrive e Dropbox).
+ */
+@Composable
+fun rememberFileImagePicker(onPicked: (Bitmap) -> Unit): () -> Unit {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val b = withContext(Dispatchers.IO) { runCatching { Images.load(ctx, uri) }.getOrNull() }
+                if (b != null) onPicked(b) else Toast.makeText(ctx, "Não consegui abrir essa imagem", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+    return { launcher.launch(arrayOf("image/*")) }
+}
+
 /** Botão redondo de disparo. */
 @Composable
 fun ShutterButton(onClick: () -> Unit, enabled: Boolean = true, size: Dp = 84.dp) {

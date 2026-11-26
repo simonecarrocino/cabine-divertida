@@ -87,4 +87,5 @@ sealed interface Screen {
     data object EventResult : Screen
     data object Events : Screen
     data object EventPhotos : Screen
+    data object Prompts : Screen
 }

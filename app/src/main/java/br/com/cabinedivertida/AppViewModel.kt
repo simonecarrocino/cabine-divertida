@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -107,10 +109,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         eventStore.saveCurrentId(c.id)
     }
 
+    /** Usa a arte enviada como moldura do evento. Se a janela vier em cinza liso, fica transparente sozinha. */
     fun useCustomFrame(b: Bitmap) {
-        eventStore.saveCustomFrame(event.id, b)
-        customFrame = b
-        updateEvent(event.copy(useCustomFrame = true))
+        val id = event.id
+        viewModelScope.launch {
+            val ready = withContext(Dispatchers.Default) { FrameTools.autoTransparentWindow(b) }
+            withContext(Dispatchers.IO) { eventStore.saveCustomFrame(id, ready) }
+            if (event.id == id) {
+                customFrame = ready
+                updateEvent(event.copy(useCustomFrame = true))
+            }
+        }
     }
 
     /** Arquivo .zip do evento, para compartilhar. */

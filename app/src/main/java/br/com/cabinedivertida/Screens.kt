@@ -51,6 +51,10 @@ fun HomeScreen(vm: AppViewModel) {
         vm.photo = b
         vm.go(Screen.Frame)
     }
+    val openFiles = rememberFileImagePicker { b ->
+        vm.photo = b
+        vm.go(Screen.Frame)
+    }
     var recents by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     LaunchedEffect(Unit) {
         recents = withContext(Dispatchers.IO) {
@@ -91,6 +95,7 @@ fun HomeScreen(vm: AppViewModel) {
         ) {
             BigButton("Tirar foto", { vm.go(Screen.Camera) }, icon = Icons.Rounded.PhotoCamera)
             OutlineBigButton("Escolher da galeria", openGallery, icon = Icons.Rounded.PhotoLibrary)
+            OutlineBigButton("Do Google Drive ou arquivos", openFiles, icon = Icons.Rounded.CloudDownload)
         }
 
         // Modo Evento
@@ -106,6 +111,25 @@ fun HomeScreen(vm: AppViewModel) {
                 Column(Modifier.weight(1f)) {
                     Text("Modo Evento", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     Text("Moldura e tamanho fixos para festas", fontSize = 13.sp, color = Cores.Bordo)
+                }
+                Icon(Icons.Rounded.ChevronRight, contentDescription = null)
+            }
+        }
+
+        // Prompts para criar molduras com IA
+        Surface(
+            onClick = { vm.go(Screen.Prompts) },
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            contentColor = Cores.BordoEscuro,
+            border = BorderStroke(2.dp, Cores.Amarelo),
+        ) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(28.dp), tint = Cores.Bordo)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Prompts para moldura", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Peça a arte para a IA no tamanho certo", fontSize = 13.sp, color = Cores.Texto2)
                 }
                 Icon(Icons.Rounded.ChevronRight, contentDescription = null)
             }
@@ -398,7 +422,7 @@ fun PrintScreen(vm: AppViewModel) {
 fun EventConfigScreen(vm: AppViewModel) {
     val ctx = LocalContext.current
     val c = vm.event
-    val pickFrame = rememberGalleryPicker { b -> vm.useCustomFrame(b) }
+    val pickFrame = rememberFileImagePicker { b -> vm.useCustomFrame(b) }
     var askDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -464,9 +488,12 @@ fun EventConfigScreen(vm: AppViewModel) {
                     }
                 }
             }
-            OutlineBigButton("Usar minha arte (PNG)", pickFrame, icon = Icons.Rounded.Upload)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlineBigButton("Usar minha arte", pickFrame, modifier = Modifier.weight(1f), icon = Icons.Rounded.Upload)
+                OutlineBigButton("Prompts IA", { vm.go(Screen.Prompts) }, modifier = Modifier.weight(1f), icon = Icons.Rounded.AutoAwesome)
+            }
             Text(
-                "Use um PNG com o meio transparente: a foto aparece por trás da sua arte.",
+                "Use um PNG com o meio transparente (pode vir do Google Drive). Se a janela da foto vier em cinza liso, como pedem os prompts, o app deixa transparente sozinho.",
                 fontSize = 13.sp,
                 color = Cores.Texto2,
             )
@@ -1027,6 +1054,94 @@ fun EventPhotosScreen(vm: AppViewModel) {
                 icon = Icons.Rounded.Download,
                 enabled = !saving,
             )
+        }
+    }
+}
+
+// =============== 11. Prompts para moldura ===============
+
+@Composable
+fun PromptsScreen(vm: AppViewModel) {
+    val ctx = LocalContext.current
+    var format by remember { mutableStateOf(vm.event.format) }
+    var name by remember { mutableStateOf(vm.event.name.takeIf { vm.events.isNotEmpty() } ?: "") }
+    var theme by remember { mutableStateOf("") }
+    var colors by remember { mutableStateOf("") }
+    val prompt = FramePrompts.build(format, name, theme, colors)
+
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        TopBar("Prompts para moldura", onBack = { vm.back() })
+        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(
+                "Escolha o formato e copie o prompt para o Gemini (ou outra IA de imagem). Ele já explica o tamanho, a janela da foto e onde o Instagram cobre a imagem.",
+                color = Cores.Texto2,
+                fontSize = 15.sp,
+            )
+            SectionLabel("Formato")
+            FormatChips(format, { format = it })
+
+            SectionLabel("Personalizar (opcional)")
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(60) },
+                label = { Text("Nome do evento") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = theme,
+                onValueChange = { theme = it.take(200) },
+                label = { Text("Tema") },
+                placeholder = { Text("Ex.: Natal artesanal com flores de feltro e pinhas") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = colors,
+                onValueChange = { colors = it.take(120) },
+                label = { Text("Cores") },
+                placeholder = { Text("Ex.: vermelho bordô, verde-pinheiro e dourado") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            SectionLabel("Prompt · ${format.label}")
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(
+                    prompt,
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = Cores.BordoEscuro,
+                    modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(14.dp)).padding(14.dp),
+                )
+            }
+            BigButton(
+                "Copiar prompt",
+                {
+                    Sharing.copyText(ctx, "Prompt de moldura", prompt)
+                    Toast.makeText(ctx, "Prompt copiado. Cole na IA.", Toast.LENGTH_SHORT).show()
+                },
+                icon = Icons.Rounded.ContentCopy,
+            )
+            OutlineBigButton(
+                "Abrir o Gemini",
+                {
+                    runCatching {
+                        ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://gemini.google.com/app")))
+                    }
+                },
+                icon = Icons.Rounded.AutoAwesome,
+            )
+            Column(
+                Modifier.fillMaxWidth().background(Cores.AmareloSuave, RoundedCornerShape(12.dp)).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("Depois que a IA fizer a arte", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Cores.BordoEscuro)
+                Text(
+                    "Salve a imagem (no celular ou no Google Drive). Em Modo Evento › Configurar evento › Usar minha arte, escolha o arquivo: a janela cinza fica transparente sozinha. Se a IA errar o tamanho ou o lugar do nome, peça o ajuste na mesma conversa.",
+                    fontSize = 13.sp,
+                    color = Cores.Texto2,
+                )
+            }
         }
     }
 }

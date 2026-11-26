@@ -93,6 +93,7 @@ fun App(vm: AppViewModel) {
             Screen.EventResult -> EventResultScreen(vm)
             Screen.Events -> EventsScreen(vm)
             Screen.EventPhotos -> EventPhotosScreen(vm)
+            Screen.Prompts -> PromptsScreen(vm)
         }
     }
 }
